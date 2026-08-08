@@ -1,0 +1,3 @@
+# Overrides for this mock only. Everything omitted falls back to the contract.
+headers:
+  Location: /petstore/v1/pets/42

@@ -1,0 +1,2 @@
+# A deliberate upstream fault, so client error handling can be exercised.
+kind: FAULT

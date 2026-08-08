@@ -1,0 +1,5 @@
+<TradePrice xmlns="http://example.com/stockquote.xsd">
+  <price>0.00</price>
+  <currency>XXX</currency>
+  <asOf>1970-01-01</asOf>
+</TradePrice>

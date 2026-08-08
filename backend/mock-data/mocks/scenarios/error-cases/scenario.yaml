@@ -1,0 +1,3 @@
+name: error-cases
+description: Upstream failure responses, so client error handling can be exercised.
+extends: baseline

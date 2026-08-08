@@ -1,0 +1,3 @@
+<DivideResponse xmlns="http://tempuri.org/">
+  <DivideResult>5</DivideResult>
+</DivideResponse>

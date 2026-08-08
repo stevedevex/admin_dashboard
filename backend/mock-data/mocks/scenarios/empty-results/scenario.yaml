@@ -1,0 +1,3 @@
+name: empty-results
+description: Empty collections. Inherits everything else from baseline.
+extends: baseline

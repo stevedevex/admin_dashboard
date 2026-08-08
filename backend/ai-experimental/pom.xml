@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.tao</groupId>
+    <artifactId>tao-sandbox</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>tao-sandbox-ai-experimental</artifactId>
+  <name>tao-sandbox :: ai-experimental</name>
+  <description>
+    Experimental AI capabilities for the sandbox. First intended use: generate mock payloads from a
+    schema and a prompt. Deliberately separate so experiments cannot destabilise the mock service.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!--
+      A model starter is not declared here on purpose. Which provider to use is a decision for
+      when this module does something, and pulling one in now would commit the project to it and
+      require credentials to build. `spring-ai-client-chat` gives the provider-neutral API.
+    -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-client-chat</artifactId>
+    </dependency>
+  </dependencies>
+</project>

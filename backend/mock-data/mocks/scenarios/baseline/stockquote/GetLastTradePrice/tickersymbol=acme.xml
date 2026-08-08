@@ -1,0 +1,5 @@
+<TradePrice xmlns="http://example.com/stockquote.xsd">
+  <price>42.00</price>
+  <currency>EUR</currency>
+  <asOf>2026-08-08</asOf>
+</TradePrice>
