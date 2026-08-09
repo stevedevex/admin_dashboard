@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The W3C WSDL 1.1 StockQuote example, bundled so the sandbox runs out of the box.
+  GetTradeHistory is added to demonstrate that an operation present in the contract but
+  absent from configuration answers NOT_IMPLEMENTED rather than pretending to work.
+-->
+<definitions name="StockQuote"
+             targetNamespace="http://example.com/stockquote.wsdl"
+             xmlns:tns="http://example.com/stockquote.wsdl"
+             xmlns:xsd1="http://example.com/stockquote.xsd"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns="http://schemas.xmlsoap.org/wsdl/">
+
+  <types>
+    <!--
+      elementFormDefault is qualified because everything in this sandbox assumes it: the configured
+      key is xpath:.../sq:TradePriceRequest/sq:tickerSymbol, the stored payloads put their children
+      in the target namespace, and calculator.wsdl declares it too. XSD defaults to unqualified, so
+      omitting it - as the published W3C example does - makes every one of those wrong, which is
+      what validating the mocks against this schema turned up.
+    -->
+    <xsd:schema targetNamespace="http://example.com/stockquote.xsd"
+                elementFormDefault="qualified"
+                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+      <xsd:element name="TradePriceRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="tickerSymbol" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="TradePrice">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="price" type="xsd:float"/>
+            <xsd:element name="currency" type="xsd:string"/>
+            <xsd:element name="asOf" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="TradeHistoryRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="tickerSymbol" type="xsd:string"/>
+            <xsd:element name="days" type="xsd:int"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="TradeHistory">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="price" type="xsd:float" maxOccurs="unbounded"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </types>
+
+  <message name="GetLastTradePriceInput">
+    <part name="body" element="xsd1:TradePriceRequest"/>
+  </message>
+  <message name="GetLastTradePriceOutput">
+    <part name="body" element="xsd1:TradePrice"/>
+  </message>
+  <message name="GetTradeHistoryInput">
+    <part name="body" element="xsd1:TradeHistoryRequest"/>
+  </message>
+  <message name="GetTradeHistoryOutput">
+    <part name="body" element="xsd1:TradeHistory"/>
+  </message>
+
+  <portType name="StockQuotePortType">
+    <operation name="GetLastTradePrice">
+      <input message="tns:GetLastTradePriceInput"/>
+      <output message="tns:GetLastTradePriceOutput"/>
+    </operation>
+    <operation name="GetTradeHistory">
+      <input message="tns:GetTradeHistoryInput"/>
+      <output message="tns:GetTradeHistoryOutput"/>
+    </operation>
+  </portType>
+
+  <binding name="StockQuoteSoapBinding" type="tns:StockQuotePortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="GetLastTradePrice">
+      <soap:operation soapAction="http://example.com/GetLastTradePrice"/>
+      <input><soap:body use="literal"/></input>
+      <output><soap:body use="literal"/></output>
+    </operation>
+    <operation name="GetTradeHistory">
+      <soap:operation soapAction="http://example.com/GetTradeHistory"/>
+      <input><soap:body use="literal"/></input>
+      <output><soap:body use="literal"/></output>
+    </operation>
+  </binding>
+
+  <service name="StockQuoteService">
+    <documentation>Stock quote lookup</documentation>
+    <port name="StockQuotePort" binding="tns:StockQuoteSoapBinding">
+      <soap:address location="http://example.com/stockquote"/>
+    </port>
+  </service>
+</definitions>

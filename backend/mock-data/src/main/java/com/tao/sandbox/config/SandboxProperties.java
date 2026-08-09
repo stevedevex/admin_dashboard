@@ -20,6 +20,7 @@ public record SandboxProperties(
         @DefaultValue("filesystem") StoreType store,
         @Valid Filesystem filesystem,
         @Valid Scenario scenario,
+        @DefaultValue @Valid RequestLog requestLog,
         @Valid @NotEmpty List<ServiceConfig> services) {
 
     public enum StoreType {
@@ -36,6 +37,17 @@ public record SandboxProperties(
              * scenarios concurrently; absent means every caller gets {@link #active}.
              */
             @DefaultValue("X-Sandbox-Scenario") String header) {}
+
+    /**
+     * The in-memory log of what the application under test called.
+     *
+     * @param capacity how many entries to retain. Bounded because an unbounded log of a service
+     *     under load is a memory leak with a friendly name.
+     * @param maxBodyBytes bodies longer than this are truncated rather than dropped, so a large
+     *     payload still shows what it was without retaining megabytes per entry
+     */
+    public record RequestLog(
+            @DefaultValue("500") int capacity, @DefaultValue("32768") int maxBodyBytes) {}
 
     public enum ServiceType {
         REST,

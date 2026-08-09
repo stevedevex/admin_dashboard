@@ -1,7 +1,9 @@
 package com.tao.sandbox.runtime.soap;
 
 import com.tao.sandbox.runtime.match.RequestFacade;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.xml.namespace.NamespaceContext;
@@ -10,19 +12,23 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 import org.springframework.http.HttpHeaders;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /** Reads a SOAP envelope for key extraction. */
 public class SoapRequestFacade implements RequestFacade {
 
     private final Document envelope;
     private final HttpHeaders headers;
+    private final SoapVersion version;
     private final XPath xpath;
 
     public SoapRequestFacade(
             Document envelope, HttpHeaders headers, Map<String, String> namespaces, SoapVersion version) {
         this.envelope = envelope;
         this.headers = headers;
+        this.version = version;
         this.xpath = XPathFactory.newInstance().newXPath();
         this.xpath.setNamespaceContext(context(namespaces, version));
     }
@@ -61,6 +67,49 @@ public class SoapRequestFacade implements RequestFacade {
             // not extracted, which points at the expression far better than a 500 would.
             return Optional.empty();
         }
+    }
+
+    /**
+     * The element names the envelope carries, from the header and from the operation's payload.
+     *
+     * <p>Local names without their namespaces, because this is read by a person comparing what they
+     * sent against what was extracted, not by anything that resolves them.
+     */
+    @Override
+    public List<String> fieldNames() {
+        List<String> names = new ArrayList<>();
+        collectChildren(envelope.getElementsByTagNameNS(version.envelopeNamespace(), "Header"), names, false);
+        collectChildren(envelope.getElementsByTagNameNS(version.envelopeNamespace(), "Body"), names, true);
+        return names;
+    }
+
+    /**
+     * @param descend the Body's own child is the operation element, so its children are the fields;
+     *     a Header's children are the fields themselves
+     */
+    private void collectChildren(NodeList sections, List<String> names, boolean descend) {
+        if (sections.getLength() == 0) {
+            return;
+        }
+
+        for (Element child : elementsOf(sections.item(0))) {
+            if (descend) {
+                elementsOf(child).forEach(field -> names.add(field.getLocalName()));
+            } else {
+                names.add(child.getLocalName());
+            }
+        }
+    }
+
+    private List<Element> elementsOf(Node parent) {
+        List<Element> elements = new ArrayList<>();
+        NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            if (children.item(i) instanceof Element element) {
+                elements.add(element);
+            }
+        }
+        return elements;
     }
 
     /**

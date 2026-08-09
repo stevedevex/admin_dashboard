@@ -1,5 +1,6 @@
 package com.tao.sandbox.runtime.rest;
 
+import com.tao.sandbox.observe.RequestLog;
 import com.tao.sandbox.runtime.resolve.MockPipeline;
 import com.tao.sandbox.runtime.resolve.ResolutionTrace;
 import com.tao.sandbox.spec.OperationDefinition;
@@ -35,7 +36,7 @@ public class RestRoutes {
     private static final Logger log = LoggerFactory.getLogger(RestRoutes.class);
 
     @Bean
-    RouterFunction<ServerResponse> mockRoutes(SpecRegistry registry, MockPipeline pipeline) {
+    RouterFunction<ServerResponse> mockRoutes(SpecRegistry registry, MockPipeline pipeline, RequestLog requests) {
         RouterFunctions.Builder routes = RouterFunctions.route();
 
         Map<String, List<OperationDefinition>> byPath =
@@ -47,7 +48,7 @@ public class RestRoutes {
                     for (OperationDefinition operation : operations) {
                         routes.route(
                                 RequestPredicates.method(operation.method()).and(RequestPredicates.path(path)),
-                                request -> handle(operation, request, pipeline));
+                                request -> handle(operation, request, pipeline, requests));
 
                         log.info(
                                 "Routing {} {} -> {}/{} ({} {})",
@@ -67,11 +68,14 @@ public class RestRoutes {
     }
 
     private ServerResponse handle(
-            OperationDefinition operation, ServerRequest request, MockPipeline pipeline) {
+            OperationDefinition operation, ServerRequest request, MockPipeline pipeline, RequestLog requests) {
 
-        var outcome = pipeline.resolve(operation, new ServerRequestFacade(request));
+        ServerRequestFacade facade = new ServerRequestFacade(request);
+        var outcome = pipeline.resolve(operation, facade);
 
         if (outcome.document().isEmpty()) {
+            requests.record(outcome.trace(), HttpStatus.NOT_FOUND.value(), facade.rawBody(), null);
+
             // Loud, never empty. An empty body here would reproduce exactly the upstream
             // behaviour the sandbox exists to eliminate, and would do it invisibly.
             return ServerResponse.status(HttpStatus.NOT_FOUND)
@@ -79,15 +83,19 @@ public class RestRoutes {
                     .body(missBody(outcome.trace()));
         }
 
-        var meta = outcome.document().get().meta();
+        var document = outcome.document().get();
+        var meta = document.meta();
 
         // Precedence: the mock's sidecar, then what the contract declares, then a default.
+        int status = meta.statusOr(operation.successStatus());
+        requests.record(outcome.trace(), status, facade.rawBody(), document.body());
+
         var response =
-                ServerResponse.status(meta.statusOr(operation.successStatus()))
+                ServerResponse.status(status)
                         .header("Content-Type", meta.contentTypeOr(operation.responseContentType()));
         meta.headers().forEach(response::header);
 
-        return response.body(outcome.document().get().body());
+        return response.body(document.body());
     }
 
     private ServerResponse methodNotAllowed(List<OperationDefinition> operations) {

@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -115,5 +116,67 @@ final class Sidecars {
         return value == null
                 ? null
                 : MockDocument.Kind.valueOf(String.valueOf(value).toUpperCase(Locale.ROOT));
+    }
+
+    // --- writing -----------------------------------------------------------
+
+    /**
+     * Writes both sidecars, or removes them.
+     *
+     * <p>Removal is the part that matters. A sidecar that survives a save which no longer specifies
+     * anything keeps applying — a 503 stays a 503 after the author clears it — and nothing on
+     * screen would explain why. So "not specified" is written by deleting the file, never by
+     * leaving the previous one in place.
+     */
+    static void write(Path payload, String envelopeHeader, MockMeta meta) {
+        writeOrDelete(pathFor(payload, ENVELOPE_HEADER), blankToNull(envelopeHeader));
+        writeOrDelete(pathFor(payload, META), render(meta));
+    }
+
+    private static void writeOrDelete(Path sidecar, String content) {
+        try {
+            if (content == null) {
+                Files.deleteIfExists(sidecar);
+            } else {
+                Files.writeString(sidecar, content, StandardCharsets.UTF_8);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not write " + sidecar, e);
+        }
+    }
+
+    /** @return the YAML to store, or null when the meta specifies nothing worth a file */
+    private static String render(MockMeta meta) {
+        if (meta == null) {
+            return null;
+        }
+
+        Map<String, Object> fields = new LinkedHashMap<>();
+        if (meta.status() != null) {
+            fields.put("status", meta.status());
+        }
+        if (meta.contentType() != null) {
+            fields.put("contentType", meta.contentType());
+        }
+        if (meta.kind() != null) {
+            fields.put("kind", meta.kind().name());
+        }
+        if (!meta.headers().isEmpty()) {
+            fields.put("headers", new LinkedHashMap<>(meta.headers()));
+        }
+
+        if (fields.isEmpty()) {
+            return null;
+        }
+
+        // Block style and unquoted keys, because these files are read and hand-edited far more
+        // often than they are written here — a round trip must not turn them into flow-style JSON.
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        return new Yaml(options).dump(fields);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip() + System.lineSeparator();
     }
 }

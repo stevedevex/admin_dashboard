@@ -22,11 +22,17 @@ public class MockPipeline {
     private final KeyExtractor extractor;
     private final MockProvider provider;
     private final SandboxProperties properties;
+    private final ActiveScenario activeScenario;
 
-    public MockPipeline(KeyExtractor extractor, MockProvider provider, SandboxProperties properties) {
+    public MockPipeline(
+            KeyExtractor extractor,
+            MockProvider provider,
+            SandboxProperties properties,
+            ActiveScenario activeScenario) {
         this.extractor = extractor;
         this.provider = provider;
         this.properties = properties;
+        this.activeScenario = activeScenario;
     }
 
     public record Outcome(Optional<MockDocument> document, ResolutionTrace trace) {}
@@ -37,7 +43,7 @@ public class MockPipeline {
         String scenarioId =
                 request.header(properties.scenario().header())
                         .filter(value -> !value.isBlank())
-                        .orElse(properties.scenario().active());
+                        .orElseGet(activeScenario::get);
 
         var extraction = extractor.extract(operation.keys(), operation.strategy(), request);
 

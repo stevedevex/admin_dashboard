@@ -24,5 +24,6 @@ public record ServiceDescriptor(
      * @param keys the declared identity fields, so the dashboard can offer them when creating a
      *     mock instead of asking anyone to type a file name
      */
-    public record OperationSummary(String id, String method, String path, List<String> keys) {}
+    public record OperationSummary(
+            String id, String method, String path, List<KeyDescriptor> keys) {}
 }

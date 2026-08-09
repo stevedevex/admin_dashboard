@@ -1,5 +1,6 @@
 package com.tao.sandbox.runtime.rest;
 
+import com.tao.sandbox.runtime.match.JsonPointers;
 import com.tao.sandbox.runtime.match.RequestFacade;
 import java.util.Optional;
 import org.springframework.web.servlet.function.ServerRequest;
@@ -26,6 +27,7 @@ public class ServerRequestFacade implements RequestFacade {
     private final ServerRequest request;
 
     private boolean bodyRead;
+    private String raw;
     private JsonNode body;
 
     public ServerRequestFacade(ServerRequest request) {
@@ -59,7 +61,7 @@ public class ServerRequestFacade implements RequestFacade {
             return Optional.empty();
         }
 
-        JsonNode node = root.at(toPointer(expression));
+        JsonNode node = root.at(JsonPointers.forExpression(expression));
         return node.isMissingNode() || node.isNull() ? Optional.empty() : Optional.of(node.asString());
     }
 
@@ -69,11 +71,27 @@ public class ServerRequestFacade implements RequestFacade {
         return Optional.empty();
     }
 
+    /**
+     * The body as it arrived, for the request log. Null when there was none.
+     *
+     * <p>Shares the single read with key extraction: the servlet input stream can only be consumed
+     * once, so a separate read for logging would take the body away from whichever ran second.
+     */
+    public String rawBody() {
+        readBody();
+        return raw;
+    }
+
     private JsonNode readBody() {
         if (!bodyRead) {
             bodyRead = true;
             try {
-                String raw = request.body(String.class);
+                raw = request.body(String.class);
+            } catch (Exception e) {
+                // No body, or one the container will not hand over — a GET, most often.
+                raw = null;
+            }
+            try {
                 body = raw == null || raw.isBlank() ? null : MAPPER.readTree(raw);
             } catch (Exception e) {
                 // A malformed body is a miss, not a crash: the trace will show no keys were
@@ -82,18 +100,5 @@ public class ServerRequestFacade implements RequestFacade {
             }
         }
         return body;
-    }
-
-    static String toPointer(String expression) {
-        String path = expression.startsWith("$") ? expression.substring(1) : expression;
-        path = path.replace("[", ".").replace("]", "");
-
-        StringBuilder pointer = new StringBuilder();
-        for (String segment : path.split("\\.")) {
-            if (!segment.isBlank()) {
-                pointer.append('/').append(segment);
-            }
-        }
-        return pointer.toString();
     }
 }

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  A hand-written contract split across two files on purpose: the schema lives in user.xsd, sibling
+  to this WSDL, and is pulled in with <xsd:include> rather than declared inline. Bundled to prove
+  the sandbox resolves a real disk-based multi-file contract the same way it resolves an inline one
+  — this is the shape most real WSDLs actually ship in, not the exception.
+-->
+<wsdl:definitions xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:tns="http://example.org"
+                  xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                  name="UserService"
+                  targetNamespace="http://example.org">
+
+  <wsdl:types>
+    <xsd:schema targetNamespace="http://example.org">
+      <!-- Including the external schema file located in the same directory -->
+      <xsd:include schemaLocation="user.xsd"/>
+    </xsd:schema>
+  </wsdl:types>
+
+  <!-- Message Definitions mapping to XSD elements -->
+  <wsdl:message name="GetUserRequestMessage">
+    <wsdl:part element="tns:GetUserRequest" name="parameters"/>
+  </wsdl:message>
+  <wsdl:message name="GetUserResponseMessage">
+    <wsdl:part element="tns:GetUserResponse" name="parameters"/>
+  </wsdl:message>
+
+  <!-- Port Type (Interface) -->
+  <wsdl:portType name="UserServicePortType">
+    <wsdl:operation name="GetUser">
+      <wsdl:input message="tns:GetUserRequestMessage"/>
+      <wsdl:output message="tns:GetUserResponseMessage"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+  <!-- Soap Binding -->
+  <wsdl:binding name="UserServiceSOAPBinding" type="tns:UserServicePortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="GetUser">
+      <soap:operation soapAction="http://example.org/GetUser"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <!-- Service Implementation Endpoint -->
+  <wsdl:service name="UserService">
+    <wsdl:port binding="tns:UserServiceSOAPBinding" name="UserServiceSOAPPort">
+      <soap:address location="http://localhost:8080/ws/userservice"/>
+    </wsdl:port>
+  </wsdl:service>
+
+</wsdl:definitions>

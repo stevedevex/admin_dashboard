@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -172,14 +173,19 @@ public class FilesystemMockRepository implements MockRepository {
     }
 
     @Override
-    public MockSummary save(MockId id, String body) {
+    public MockSummary save(MockId id, MockDocument document) {
+        requireScenario(id.scenarioId());
+
         Path path = pathFor(id.scenarioId(), id.serviceId(), id.operationId(), id.fileName());
         try {
             Files.createDirectories(path.getParent());
-            Files.writeString(path, body, StandardCharsets.UTF_8);
+            Files.writeString(path, document.body(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not write " + path, e);
         }
+
+        Sidecars.write(path, document.envelopeHeader(), document.meta());
+
         return summarise(
                 id.scenarioId(), id.scenarioId(), path, id.serviceId(), id.operationId(), id.fileName());
     }
@@ -203,7 +209,104 @@ public class FilesystemMockRepository implements MockRepository {
         return List.copyOf(scenarios.values());
     }
 
+    @Override
+    public Scenario createScenario(String id, String name, String description, String parent) {
+        requireSegment(id);
+
+        if (scenarios.containsKey(id)) {
+            throw new IllegalStateException("Scenario '" + id + "' already exists");
+        }
+        if (parent != null && !scenarios.containsKey(parent)) {
+            throw new IllegalArgumentException(
+                    "Cannot extend '%s': it does not exist. Scenarios: %s".formatted(parent, scenarios.keySet()));
+        }
+
+        // A new scenario cannot close a cycle unless it extends itself — every other ancestor
+        // already existed and was acyclic — but the check is cheap and states the rule once.
+        if (id.equals(parent)) {
+            throw new IllegalArgumentException("A scenario cannot extend itself");
+        }
+
+        Map<String, Object> descriptor = new LinkedHashMap<>();
+        descriptor.put("name", name == null || name.isBlank() ? id : name);
+        descriptor.put("description", description == null ? "" : description);
+        if (parent != null) {
+            descriptor.put("extends", parent);
+        }
+
+        Path directory = root.resolve("scenarios").resolve(id);
+        try {
+            Files.createDirectories(directory);
+            DumperOptions options = new DumperOptions();
+            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            Files.writeString(
+                    directory.resolve("scenario.yaml"), new Yaml(options).dump(descriptor), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not create " + directory, e);
+        }
+
+        readScenario(directory);
+        return scenarios.get(id);
+    }
+
+    @Override
+    public void deleteScenario(String id) {
+        requireScenario(id);
+
+        String child =
+                scenarios.values().stream()
+                        .filter(scenario -> id.equals(scenario.parent()))
+                        .map(Scenario::id)
+                        .findFirst()
+                        .orElse(null);
+
+        if (child != null) {
+            // Orphaning a child would silently change what it serves: every mock it inherited
+            // disappears, and the scenario keeps running with a quietly smaller library.
+            throw new IllegalStateException("'%s' is extended by '%s'".formatted(id, child));
+        }
+
+        Path directory = root.resolve("scenarios").resolve(id);
+        try (Stream<Path> contents = Files.walk(directory)) {
+            // Deepest first, because a directory cannot be removed until it is empty.
+            for (Path path : contents.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not delete " + directory, e);
+        }
+
+        scenarios.remove(id);
+    }
+
+    @Override
+    public String location() {
+        return root.toString();
+    }
+
     // --- internals ---------------------------------------------------------
+
+    /**
+     * Writing into a scenario that does not exist would create its directory as a side effect, and
+     * a scenario with no {@code scenario.yaml} inherits from nothing — so the mock would resolve
+     * only for callers naming that scenario exactly, which is never what was meant.
+     */
+    private void requireScenario(String scenarioId) {
+        if (!scenarios.containsKey(scenarioId)) {
+            throw new IllegalArgumentException(
+                    "No such scenario '%s'. Scenarios: %s".formatted(scenarioId, scenarios.keySet()));
+        }
+    }
+
+    /** The id becomes a directory name, so it has to be one. */
+    private static void requireSegment(String id) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("A scenario needs an id");
+        }
+        if (id.contains("/") || id.contains("\\") || id.equals(".") || id.equals("..")) {
+            throw new IllegalArgumentException("Illegal scenario id '" + id + "': it names one directory");
+        }
+    }
 
     /** Scenario ids from the requested one up through its ancestors, nearest first. */
     private List<String> chain(String scenarioId) {

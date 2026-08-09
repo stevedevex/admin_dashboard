@@ -1,0 +1,362 @@
+package com.tao.sandbox.control;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
+
+/**
+ * The control-panel contract, exercised against the sandbox's own configuration.
+ *
+ * <p>Against the real specs and the real mock library rather than fixtures, because most of what
+ * these endpoints assert is that the two agree — that a name computed for {@code GetLastTradePrice}
+ * is the name of a file the resolver would actually find. A fixture would let the two drift and
+ * still pass.
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+class ControlPanelApiTest {
+
+    @Autowired private MockMvcTester mvc;
+
+    @Test
+    void statusDescribesTheSandbox() {
+        MvcTestResult result = mvc.get().uri("/__tao/status").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.store").isEqualTo("FILESYSTEM");
+        assertThat(result).bodyJson().extractingPath("$.activeScenario").isEqualTo("baseline");
+        assertThat(result).bodyJson().extractingPath("$.scenarioHeader").isEqualTo("X-Sandbox-Scenario");
+        assertThat(result).bodyJson().extractingPath("$.serviceCount").isEqualTo(5);
+        assertThat(result).bodyJson().extractingPath("$.startupProblems").asArray().isEmpty();
+        assertThat(result).bodyJson().extractingPath("$.root").asString().endsWith("mocks");
+    }
+
+    /**
+     * The dashboard renders an input per key and sends the values back to {@code /mocks/name}. It
+     * can only do that if the key arrives already named — deriving {@code tickerSymbol} from the
+     * XPath is the server's job, done once.
+     */
+    @Test
+    void servicesNameTheirKeysRatherThanOnlyDeclaringThem() {
+        MvcTestResult result = mvc.get().uri("/__tao/services").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='stockquote')].operations[0].keys[0].name")
+                .asArray()
+                .containsExactly("tickerSymbol");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='stockquote')].operations[0].keys[0].source")
+                .asArray()
+                .containsExactly("XPATH");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='petstore')].endpoint")
+                .asArray()
+                .containsExactly("/petstore/v1");
+    }
+
+    @Test
+    void schemaIsReturnedWithItsRefsInlined() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/services/petstore/operations/showPetById/schema").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.format").isEqualTo("JSON");
+        assertThat(result).bodyJson().extractingPath("$.available").isEqualTo(true);
+        // A $ref here would be unresolvable to a caller never given the components section.
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.schema")
+                .asString()
+                .contains("\"name\"")
+                .doesNotContain("$ref");
+    }
+
+    /**
+     * Taken out of the WSDL's inline {@code <wsdl:types>}, with the prefixes it relies on carried
+     * down from the root — {@code xsd1} is bound on {@code <definitions>}, and a schema lifted out
+     * without it does not compile.
+     */
+    @Test
+    void aSoapOperationReturnsTheSchemaFromItsWsdl() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/services/stockquote/operations/GetLastTradePrice/schema").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.format").isEqualTo("XSD");
+        assertThat(result).bodyJson().extractingPath("$.available").isEqualTo(true);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.schema")
+                .asString()
+                .contains("TradePrice")
+                .contains("http://example.com/stockquote.xsd");
+    }
+
+    /** No schema is a state, not a failure — and it has to say why, or it reads as a defect. */
+    @Test
+    void anOperationWithNoDeclaredBodySaysWhyRatherThanJustNo() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/services/tictactoe/operations/get-board/schema").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.available").isNotNull();
+    }
+
+    @Test
+    void anUnknownOperationIsAProblemNamingTheOnesThatExist() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/services/petstore/operations/nosuchop/schema").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.type")
+                .isEqualTo("urn:tao:sandbox:operation-not-found");
+        assertThat(result).bodyJson().extractingPath("$.detail").asString().contains("showPetById");
+    }
+
+    /** A child scenario owns its overrides, not everything it can serve. */
+    @Test
+    void scenarioMockCountsExcludeWhatIsInherited() {
+        MvcTestResult result = mvc.get().uri("/__tao/scenarios").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='empty-results')].parent")
+                .asArray()
+                .containsExactly("baseline");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='empty-results')].mockCount")
+                .asArray()
+                .containsExactly(2);
+    }
+
+    @Test
+    void listingAScenarioIncludesWhatItInheritsFlagged() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/mocks?scenario=empty-results&service=petstore").exchange();
+
+        assertThat(result).hasStatusOk();
+        // The override this scenario exists for…
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.operationId=='listPets' && @.fileName=='_default.json')].inherited")
+                .asArray()
+                .containsExactly(false);
+        // …and its sibling in the same directory, which the override does not displace. Only the
+        // slot is overridden, not the operation, so limit=1 still resolves through the parent.
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.operationId=='listPets' && @.fileName=='limit=1.json')].inherited")
+                .asArray()
+                .containsExactly(true);
+        // …and showPetById, which only baseline stores.
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.operationId=='showPetById')].inheritedFrom")
+                .asArray()
+                .containsOnly("baseline");
+        assertThat(result).bodyJson().extractingPath("$[0].state").isEqualTo("unchecked");
+        assertThat(result).bodyJson().extractingPath("$[0].completeness").isNull();
+    }
+
+    @Test
+    void anUnknownScenarioIsAProblemRatherThanAnEmptyList() {
+        MvcTestResult result = mvc.get().uri("/__tao/mocks?scenario=nosuch").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.type")
+                .isEqualTo("urn:tao:sandbox:scenario-not-found");
+    }
+
+    /**
+     * The 201 is in the OpenAPI document and nowhere else. An author has to be able to see that,
+     * which means seeing an empty sidecar and a 201 side by side.
+     */
+    @Test
+    void effectiveStatusComesFromTheContractWhenTheSidecarIsSilent() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/mocks/baseline/petstore/createPets/_default.json").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.meta.status").isNull();
+        assertThat(result).bodyJson().extractingPath("$.effective.status").isEqualTo(201);
+        assertThat(result).bodyJson().extractingPath("$.effective.contentType").isEqualTo("application/json");
+        assertThat(result).bodyJson().extractingPath("$.body").asString().isNotEmpty();
+    }
+
+    /** A sidecar outranks the contract, and both readings stay visible. */
+    @Test
+    void aSidecarOutranksTheContractAndBothStayVisible() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/mocks/error-cases/petstore/showPetById/_default.json").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.meta.status").isEqualTo(503);
+        assertThat(result).bodyJson().extractingPath("$.meta.headers.Retry-After").isEqualTo("30");
+        assertThat(result).bodyJson().extractingPath("$.effective.status").isEqualTo(503);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.effective.contentType")
+                .isEqualTo("application/problem+json");
+    }
+
+    /**
+     * A SOAP fault answers 500, not the 200 a response would. Getting that wrong makes a mocked
+     * failure look like a success to every client that keys off the status.
+     */
+    @Test
+    void aSoapFaultsEffectiveStatusIsNotTwoHundred() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/mocks/baseline/calculator/Divide/inta=10&intb=0.xml").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.meta.kind").isEqualTo("FAULT");
+        assertThat(result).bodyJson().extractingPath("$.meta.status").isNull();
+        assertThat(result).bodyJson().extractingPath("$.effective.status").isEqualTo(500);
+    }
+
+    @Test
+    void aMockRespondsAnEtag() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/mocks/baseline/petstore/showPetById/petid=1.json").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result.getResponse().getHeader("ETag")).isNotNull().startsWith("\"");
+    }
+
+    /** A part of a mock id that is a path, rather than one directory or file, is refused. */
+    @Test
+    void aMockIdWhoseFileNameIsAPathIsRejected() {
+        MvcTestResult result = mvc.get().uri("/__tao/mocks/baseline/petstore/showPetById/sub/dir.json").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
+    void aMissingMockIsAProblemNamingIt() {
+        MvcTestResult result =
+                mvc.get().uri("/__tao/mocks/baseline/petstore/showPetById/petid=999.json").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.type").isEqualTo("urn:tao:sandbox:mock-not-found");
+    }
+
+    /**
+     * The name this computes must be the name the resolver looks for. {@code tickersymbol=ibm.xml}
+     * exists on disk, and this is what proves the two agree.
+     */
+    @Test
+    void aNameIsComputedTheWayARequestWouldResolve() {
+        MvcTestResult result =
+                mvc.post()
+                        .uri("/__tao/mocks/name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "serviceId": "stockquote",
+                                  "operationId": "GetLastTradePrice",
+                                  "keys": { "tickerSymbol": "IBM" } }""")
+                        .exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.fileName").isEqualTo("tickersymbol=ibm.xml");
+        assertThat(result).bodyJson().extractingPath("$.normalised.tickerSymbol").isEqualTo("ibm");
+    }
+
+    /** Zero-padding is stripped, so 0000001 and 1 cannot become two files, one unreachable. */
+    @Test
+    void aNameIsNormalisedBeforeItBecomesAFile() {
+        MvcTestResult result =
+                mvc.post()
+                        .uri("/__tao/mocks/name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "serviceId": "petstore",
+                                  "operationId": "showPetById",
+                                  "keys": { "petId": "  0000001 " } }""")
+                        .exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.fileName").isEqualTo("petid=1.json");
+    }
+
+    /** No keys names the fallback the resolver tries last — a mock authors legitimately write. */
+    @Test
+    void noKeysNamesTheDefaultMock() {
+        MvcTestResult result =
+                mvc.post()
+                        .uri("/__tao/mocks/name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "serviceId": "petstore", "operationId": "showPetById", "keys": {} }""")
+                        .exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.fileName").isEqualTo("_default.json");
+    }
+
+    /** Divide resolves on both operands; a file named from one of them is unreachable. */
+    @Test
+    void aPartialKeySetIsRefusedRatherThanNamed() {
+        MvcTestResult result =
+                mvc.post()
+                        .uri("/__tao/mocks/name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "serviceId": "calculator",
+                                  "operationId": "Divide",
+                                  "keys": { "intA": "10" } }""")
+                        .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(result).bodyJson().extractingPath("$.type").isEqualTo("urn:tao:sandbox:incomplete-keys");
+    }
+
+    /** Declaration order, not the order the caller happened to send them in. */
+    @Test
+    void multipleKeysAreNamedInDeclarationOrder() {
+        MvcTestResult result =
+                mvc.post()
+                        .uri("/__tao/mocks/name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "serviceId": "calculator",
+                                  "operationId": "Divide",
+                                  "keys": { "intB": "0", "intA": "10" } }""")
+                        .exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.fileName").isEqualTo("inta=10&intb=0.xml");
+    }
+
+    @Test
+    void reloadAnswersWithTheNewStatus() {
+        MvcTestResult result = mvc.post().uri("/__tao/reload").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.activeScenario").isEqualTo("baseline");
+    }
+}

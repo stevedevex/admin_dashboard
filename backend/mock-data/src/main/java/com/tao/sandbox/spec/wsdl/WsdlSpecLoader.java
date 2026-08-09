@@ -23,9 +23,10 @@ import org.w3c.dom.NodeList;
 /**
  * Reads a WSDL with DOM rather than a WSDL library.
  *
- * <p>Only four things are needed — the operations, the element that identifies each one on the
- * wire, the published endpoint address, and the target namespace. A WSDL library would supply all
- * of that plus a large dependency and a binding model this service has no use for.
+ * <p>Only a handful of things are needed — the operations, the element that identifies each one on
+ * the wire, the published endpoint address, the target namespace, and the schema describing what
+ * each operation returns. A WSDL library would supply all of that plus a large dependency and a
+ * binding model this service has no use for.
  */
 @Component
 public class WsdlSpecLoader {
@@ -94,6 +95,8 @@ public class WsdlSpecLoader {
             return null;
         }
 
+        Map<String, String> imports = collectAllSchemaReferences(service, definitions, problems);
+
         return new SoapServiceDefinition(
                 service.id(),
                 service.path(),
@@ -103,8 +106,9 @@ public class WsdlSpecLoader {
                 elementToOperation,
                 served,
                 service.namespaces() == null ? Map.of() : service.namespaces(),
-                readImports(service, definitions, problems),
-                readResponseHeader(service, problems));
+                imports,
+                readResponseHeader(service, problems),
+                XsdExtractor.extract(service.id(), definitions, imports, problems));
     }
 
     /** The service-wide envelope header, if one is configured. */
@@ -207,57 +211,110 @@ public class WsdlSpecLoader {
     }
 
     /**
-     * Loads documents referenced by {@code schemaLocation} or {@code location}, keyed by the
-     * reference as written.
+     * Every document reachable from the WSDL by {@code <xsd:import>}, {@code <xsd:include>} or
+     * {@code <wsdl:import>}, keyed by the reference exactly as written — transitively, since a
+     * schema split across files routinely has one file including another.
      *
-     * <p>Relative references are resolved against the WSDL itself, which is how a client would
-     * resolve them. Only relative ones are followed: an absolute URL points somewhere the sandbox
-     * does not control and should not be fetched at startup.
+     * <p>{@code <xsd:include>} matters as much as {@code <xsd:import>} here even though the two mean
+     * different things — import brings in a different namespace, include extends the same one — a
+     * type or element declared only in an included file is invisible to validation otherwise, and a
+     * multi-file contract split by convention rather than namespace is the common shape, not the
+     * exception.
+     *
+     * <p>Every reference is resolved relative to the WSDL's own location, not to whichever document
+     * did the including. That matches every real example seen so far — an unpacked contract with the
+     * WSDL and every {@code .xsd} it needs sitting flat as siblings — and is simpler and more
+     * predictable than tracking a different base per file for a directory layout nothing has needed
+     * yet. A reference that needs resolving relative to its own including document, rather than the
+     * WSDL, is not supported; such a WSDL would need this revisited, not silently mishandled.
+     *
+     * <p>Only relative references are followed: an absolute URL points somewhere the sandbox does
+     * not control and should not be fetched at startup.
      */
-    private Map<String, String> readImports(
+    private Map<String, String> collectAllSchemaReferences(
             ServiceConfig service, Element definitions, List<String> problems) {
 
         Map<String, String> loaded = new LinkedHashMap<>();
+        java.util.Deque<String> queue = new java.util.ArrayDeque<>(referencesIn(definitions));
+        java.util.Set<String> queued = new java.util.HashSet<>(queue);
 
-        for (String reference : collectImportLocations(definitions)) {
-            if (reference.isBlank() || reference.contains("://")) {
+        while (!queue.isEmpty()) {
+            String reference = queue.poll();
+
+            if (reference.isBlank() || reference.contains("://") || loaded.containsKey(reference)) {
                 continue;
             }
 
+            Resource resource;
             try {
-                Resource resource = resources.getResource(service.wsdl()).createRelative(reference);
+                resource = resources.getResource(service.wsdl()).createRelative(reference);
                 if (!resource.exists()) {
                     problems.add(
-                            "%s: WSDL imports '%s' but it was not found next to %s"
+                            "%s: WSDL references '%s' but it was not found next to %s"
                                     .formatted(service.id(), reference, service.wsdl()));
                     continue;
                 }
-                try (InputStream in = resource.getInputStream()) {
-                    loaded.put(reference, new String(in.readAllBytes(), StandardCharsets.UTF_8));
-                }
             } catch (IOException e) {
                 problems.add(
-                        "%s: could not read import '%s' — %s".formatted(service.id(), reference, e.getMessage()));
+                        "%s: could not resolve reference '%s' — %s"
+                                .formatted(service.id(), reference, e.getMessage()));
+                continue;
+            }
+
+            String content;
+            try (InputStream in = resource.getInputStream()) {
+                content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                problems.add(
+                        "%s: could not read reference '%s' — %s"
+                                .formatted(service.id(), reference, e.getMessage()));
+                continue;
+            }
+
+            loaded.put(reference, content);
+
+            // A schema or WSDL fetched here may itself import or include further siblings — the
+            // second and third screenshots this design was checked against both have exactly this
+            // shape, files referenced only from within another referenced file, never from the WSDL
+            // directly.
+            try {
+                Element root = Xml.parse(content).getDocumentElement();
+                for (String nested : referencesIn(root)) {
+                    if (queued.add(nested)) {
+                        queue.add(nested);
+                    }
+                }
+            } catch (RuntimeException e) {
+                problems.add(
+                        "%s: '%s' could not be parsed, so anything it references is unreachable — %s"
+                                .formatted(service.id(), reference, e.getMessage()));
             }
         }
 
         return loaded;
     }
 
-    private List<String> collectImportLocations(Element definitions) {
+    /** {@code schemaLocation} or {@code location} on any {@code import}, {@code include} or {@code redefine}. */
+    private List<String> referencesIn(Element root) {
         List<String> locations = new ArrayList<>();
-        NodeList all = definitions.getOwnerDocument().getElementsByTagName("*");
+        NodeList all = root.getOwnerDocument().getElementsByTagName("*");
 
         for (int i = 0; i < all.getLength(); i++) {
-            if (all.item(i) instanceof Element element && "import".equals(element.getLocalName())) {
-                String schemaLocation = element.getAttribute("schemaLocation");
-                String location = element.getAttribute("location");
-                if (!schemaLocation.isBlank()) {
-                    locations.add(schemaLocation);
-                }
-                if (!location.isBlank()) {
-                    locations.add(location);
-                }
+            if (!(all.item(i) instanceof Element element)) {
+                continue;
+            }
+            String name = element.getLocalName();
+            if (!"import".equals(name) && !"include".equals(name) && !"redefine".equals(name)) {
+                continue;
+            }
+
+            String schemaLocation = element.getAttribute("schemaLocation");
+            String location = element.getAttribute("location");
+            if (!schemaLocation.isBlank()) {
+                locations.add(schemaLocation);
+            }
+            if (!location.isBlank()) {
+                locations.add(location);
             }
         }
 

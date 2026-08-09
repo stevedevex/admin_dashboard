@@ -34,6 +34,7 @@ public class SpecRegistry {
 
     private final Map<String, OperationDefinition> restByKey = new LinkedHashMap<>();
     private final Map<String, SoapServiceDefinition> soapByService = new LinkedHashMap<>();
+    private final Map<String, String> responseSchemas = new LinkedHashMap<>();
     private final List<ServiceDescriptor> descriptors = new ArrayList<>();
 
     public SpecRegistry(
@@ -49,9 +50,11 @@ public class SpecRegistry {
 
         for (ServiceConfig service : properties.services()) {
             if (service.type() == ServiceType.REST) {
-                List<OperationDefinition> operations = openApiLoader.load(service, problems);
-                operations.forEach(op -> restByKey.put(key(op.serviceId(), op.operationId()), op));
-                descriptors.add(describeRest(service, operations));
+                OpenApiSpecLoader.Loaded loaded = openApiLoader.load(service, problems);
+                loaded.operations().forEach(op -> restByKey.put(key(op.serviceId(), op.operationId()), op));
+                loaded.responseSchemas()
+                        .forEach((operationId, schema) -> responseSchemas.put(key(service.id(), operationId), schema));
+                descriptors.add(describeRest(service, loaded.operations()));
             } else {
                 SoapServiceDefinition definition = wsdlLoader.load(service, problems);
                 if (definition != null) {
@@ -90,7 +93,7 @@ public class SpecRegistry {
                                                 op.operationId(),
                                                 op.method().name(),
                                                 op.path(),
-                                                op.keys().stream().map(k -> k.source() + ":" + k.expression()).toList()))
+                                                op.keys().stream().map(KeyDescriptor::of).toList()))
                         .toList());
     }
 
@@ -108,7 +111,7 @@ public class SpecRegistry {
                                                 op.operationId(),
                                                 "POST",
                                                 definition.path(),
-                                                op.keys().stream().map(k -> k.source() + ":" + k.expression()).toList()))
+                                                op.keys().stream().map(KeyDescriptor::of).toList()))
                         .toList());
     }
 
@@ -125,8 +128,44 @@ public class SpecRegistry {
         return List.copyOf(soapByService.values());
     }
 
+    public Optional<ServiceDescriptor> findService(String serviceId) {
+        return descriptors.stream().filter(service -> service.id().equals(serviceId)).findFirst();
+    }
+
     public Optional<OperationDefinition> findRest(String serviceId, String operationId) {
         return Optional.ofNullable(restByKey.get(key(serviceId, operationId)));
+    }
+
+    /**
+     * One served operation, whatever its protocol.
+     *
+     * <p>Narrowed to {@link ServedOperation} because the control panel's questions — what are the
+     * keys, which strategy applies — are the protocol-independent ones. A caller that needs the
+     * REST route or the SOAP binding asks {@link #findRest} or {@link #soapServices} instead.
+     */
+    public Optional<ServedOperation> findOperation(String serviceId, String operationId) {
+        OperationDefinition rest = restByKey.get(key(serviceId, operationId));
+        if (rest != null) {
+            return Optional.of(rest);
+        }
+
+        SoapServiceDefinition soap = soapByService.get(serviceId);
+        return soap == null ? Optional.empty() : Optional.ofNullable(soap.served().get(operationId));
+    }
+
+    /** The XSD a SOAP service declares, and each operation's response element. */
+    public Optional<com.tao.sandbox.spec.wsdl.SoapSchemas> soapSchemas(String serviceId) {
+        return Optional.ofNullable(soapByService.get(serviceId)).map(SoapServiceDefinition::schemas);
+    }
+
+    /**
+     * The success response's schema, for operations whose contract declares one.
+     *
+     * <p>Empty is a normal answer, not a fault: a WSDL's response schema is not extracted yet, and
+     * plenty of REST operations declare no response body at all.
+     */
+    public Optional<String> findResponseSchema(String serviceId, String operationId) {
+        return Optional.ofNullable(responseSchemas.get(key(serviceId, operationId)));
     }
 
     private static String key(String serviceId, String operationId) {

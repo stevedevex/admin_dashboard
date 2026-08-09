@@ -12,8 +12,11 @@ import javax.xml.namespace.QName;
  *     GetLastTradePrice}). Guessing one from the other does not work.
  * @param served operations named in configuration; anything else answers NOT_IMPLEMENTED
  * @param originalAddress the endpoint the real service publishes, replaced when the WSDL is served
- * @param imports schema name → content, for the WSDL's {@code <import>}ed documents
+ * @param imports every document the WSDL reaches by {@code <xsd:import>}, {@code <xsd:include>} or
+ *     {@code <wsdl:import>}, keyed by the reference exactly as written, gathered transitively — a
+ *     file this imports is walked too, not just the WSDL's own direct references
  * @param defaultResponseHeader envelope header for every response, unless a mock overrides it
+ * @param schemas the XSD taken out of this WSDL, and each operation's response element
  */
 public record SoapServiceDefinition(
         String serviceId,
@@ -25,7 +28,8 @@ public record SoapServiceDefinition(
         Map<String, SoapOperationDefinition> served,
         Map<String, String> namespaces,
         Map<String, String> imports,
-        String defaultResponseHeader) {
+        String defaultResponseHeader,
+        SoapSchemas schemas) {
 
     /**
      * The WSDL as a client should see it: the endpoint replaced with this server, and every

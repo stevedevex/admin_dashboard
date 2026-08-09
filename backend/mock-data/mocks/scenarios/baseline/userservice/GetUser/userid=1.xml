@@ -1,0 +1,4 @@
+<GetUserResponse xmlns="http://example.org">
+  <Name>Ada Lovelace</Name>
+  <Email>ada@example.org</Email>
+</GetUserResponse>

@@ -1,4 +1,0 @@
-<sqh:ResponseContext xmlns:sqh="http://example.com/stockquote.xsd">
-  <sqh:source>tao-sandbox</sqh:source>
-  <sqh:cacheable>false</sqh:cacheable>
-</sqh:ResponseContext>

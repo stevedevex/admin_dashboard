@@ -40,6 +40,13 @@
       <groupId>com.networknt</groupId>
       <artifactId>json-schema-validator</artifactId>
     </dependency>
+
+    <!-- MockMvc's auto-configuration left spring-boot-starter-test in Boot 4 and now ships here. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

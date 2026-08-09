@@ -1,5 +1,6 @@
 package com.tao.sandbox.runtime.soap;
 
+import com.tao.sandbox.observe.RequestLog;
 import com.tao.sandbox.runtime.resolve.MockPipeline;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockDocument.Kind;
@@ -34,7 +35,8 @@ public class SoapRoutes {
      * called {@code soapRoutes} inside {@code SoapRoutes} collides with it.
      */
     @Bean
-    RouterFunction<ServerResponse> soapMockRoutes(SpecRegistry registry, MockPipeline pipeline) {
+    RouterFunction<ServerResponse> soapMockRoutes(
+            SpecRegistry registry, MockPipeline pipeline, RequestLog requests) {
         RouterFunctions.Builder routes = RouterFunctions.route();
 
         for (SoapServiceDefinition service : registry.soapServices()) {
@@ -46,7 +48,8 @@ public class SoapRoutes {
                     RequestPredicates.GET(service.path()).and(request -> request.param("xsd").isPresent()),
                     request -> importedSchema(service, request));
 
-            routes.route(RequestPredicates.POST(service.path()), request -> handle(service, request, pipeline));
+            routes.route(
+                    RequestPredicates.POST(service.path()), request -> handle(service, request, pipeline, requests));
 
             log.info(
                     "Routing SOAP {} -> {} serving {}",
@@ -59,14 +62,16 @@ public class SoapRoutes {
     }
 
     private ServerResponse handle(
-            SoapServiceDefinition service, ServerRequest request, MockPipeline pipeline) {
+            SoapServiceDefinition service, ServerRequest request, MockPipeline pipeline, RequestLog requests) {
 
         Document envelope;
         SoapVersion version;
         QName bodyElement;
+        String raw;
 
         try {
-            envelope = Xml.parse(request.body(String.class));
+            raw = request.body(String.class);
+            envelope = Xml.parse(raw);
             version =
                     SoapVersion.of(envelope)
                             .orElseThrow(
@@ -78,19 +83,29 @@ public class SoapRoutes {
         } catch (Exception e) {
             // The version is unknown at this point, so answer in 1.1 — the older client is the one
             // more likely to be unable to read the newer format.
+            String reason = "Malformed SOAP request: " + e.getMessage();
+            requests.recordRejected(service.serviceId(), reason, SoapVersion.SOAP_1_1.httpStatusFor(
+                    SoapVersion.SOAP_1_1.senderCode()), null);
             return fault(SoapVersion.SOAP_1_1, SoapVersion.SOAP_1_1.senderCode(),
                     "Malformed SOAP request", String.valueOf(e.getMessage()));
         }
 
         String operationName = service.elementToOperation().get(bodyElement);
         if (operationName == null) {
-            return fault(version, version.senderCode(),
-                    "Unknown operation for body element " + bodyElement,
+            String reason = "Unknown operation for body element " + bodyElement;
+            requests.recordRejected(
+                    service.serviceId(), reason, version.httpStatusFor(version.senderCode()), raw);
+            return fault(version, version.senderCode(), reason,
                     "Known elements: " + service.elementToOperation().keySet());
         }
 
         SoapOperationDefinition operation = service.served().get(operationName);
         if (operation == null) {
+            requests.recordRejected(
+                    service.serviceId(),
+                    "NOT_IMPLEMENTED: '%s' is in the contract but not configured".formatted(operationName),
+                    501,
+                    raw);
             // Present in the contract, absent from configuration. Saying so plainly is far more
             // useful than an empty response that looks like a data problem.
             return ServerResponse.status(501)
@@ -111,6 +126,8 @@ public class SoapRoutes {
                                 envelope, request.headers().asHttpHeaders(), service.namespaces(), version));
 
         if (outcome.document().isEmpty()) {
+            requests.record(
+                    outcome.trace(), version.httpStatusFor(version.receiverCode()), raw, null);
             return fault(version, version.receiverCode(),
                     "No mock matched this request", outcome.trace().explain());
         }
@@ -134,9 +151,13 @@ public class SoapRoutes {
         // the status long before they parse the body. So a fault defaults to the version's fault
         // status, and only an explicit sidecar entry can override that.
         int defaultStatus = isFault ? version.httpStatusFor(version.receiverCode()) : 200;
+        int status = meta.statusOr(defaultStatus);
+
+        // The wrapped envelope, not the stored payload: the log should show what left the server.
+        requests.record(outcome.trace(), status, raw, body);
 
         var response =
-                ServerResponse.status(meta.statusOr(defaultStatus))
+                ServerResponse.status(status)
                         .header("Content-Type", meta.contentTypeOr(version.contentType()));
         meta.headers().forEach(response::header);
         return response.body(body);
