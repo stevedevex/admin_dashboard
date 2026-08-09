@@ -8,6 +8,14 @@ server:
 logging.level:
   com.tao.sandbox: INFO
 
+# Swagger over the control panel. Entry points live under the reserved /__tao prefix, like the
+# API they document, so a dropped-in customer contract can never shadow them. Only /__tao/** is
+# documented — the data plane imitates other people's contracts, which are their own documents.
+springdoc:
+  api-docs.path: /__tao/openapi
+  swagger-ui.path: /__tao/swagger
+  paths-to-match: /__tao/**
+
 # ---------------------------------------------------------------------------
 # The whole adoption surface: drop in a spec, name the operations you want
 # served, declare what identifies a request. Everything else is derived.

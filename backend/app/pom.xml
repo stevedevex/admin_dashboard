@@ -21,6 +21,13 @@
       <artifactId>tao-sandbox-mock-data</artifactId>
       <version>${project.version}</version>
     </dependency>
+
+    <!-- Swagger UI over the control-panel API. Lives here, not in a feature module: what is
+         documented is the running application, whichever features it happens to be composed of. -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

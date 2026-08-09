@@ -25,7 +25,11 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
-    <!-- OpenAPI ingestion. XML and XSD work uses the JDK, so there is no WSDL library. -->
+    <!-- OpenAPI ingestion. XML and XSD work uses the JDK, so there is no WSDL library.
+         The javax-flavoured swagger-core artifacts are excluded and replaced with the jakarta
+         flavour below: the two jars carry identical class names, springdoc (in the app module)
+         ships jakarta, and whichever flavour wins the classpath decides whether the other's
+         users crash on a missing javax.xml.bind. One flavour, everywhere. -->
     <dependency>
       <groupId>io.swagger.parser.v3</groupId>
       <artifactId>swagger-parser</artifactId>
@@ -34,7 +38,19 @@
           <groupId>io.swagger.core.v3</groupId>
           <artifactId>swagger-annotations</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>io.swagger.core.v3</groupId>
+          <artifactId>swagger-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.swagger.core.v3</groupId>
+          <artifactId>swagger-models</artifactId>
+        </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-core-jakarta</artifactId>
     </dependency>
 
     <dependency>

@@ -29,6 +29,8 @@
     <java.version>25</java.version>
     <maven.compiler.release>25</maven.compiler.release>
     <swagger-parser.version>2.1.31</swagger-parser.version>
+    <springdoc.version>3.1.0</springdoc.version>
+    <swagger-core.version>2.2.34</swagger-core.version>
     <json-schema-validator.version>1.5.9</json-schema-validator.version>
     <spring-ai.version>2.0.0</spring-ai.version>
   </properties>
@@ -47,6 +49,16 @@
         <groupId>io.swagger.parser.v3</groupId>
         <artifactId>swagger-parser</artifactId>
         <version>${swagger-parser.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-core-jakarta</artifactId>
+        <version>${swagger-core.version}</version>
       </dependency>
       <dependency>
         <groupId>com.networknt</groupId>
