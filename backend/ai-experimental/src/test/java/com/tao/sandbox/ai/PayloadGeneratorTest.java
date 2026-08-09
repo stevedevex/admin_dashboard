@@ -7,9 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.tao.sandbox.ai.llm.ChatRequest;
-import com.tao.sandbox.ai.llm.ChatResponse;
-import com.tao.sandbox.ai.llm.LlmClient;
+import com.tao.sandbox.ai.llm.ModelProvider;
 import com.tao.sandbox.config.SandboxProperties.ServiceType;
 import com.tao.sandbox.spec.ServiceDescriptor;
 import com.tao.sandbox.spec.SpecRegistry;
@@ -22,6 +20,14 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 /**
  * The loop, not the model.
@@ -32,25 +38,51 @@ import org.junit.jupiter.api.Test;
  */
 class PayloadGeneratorTest {
 
-    /** Answers a queued script in order, and records what it was asked. */
-    private static final class ScriptedClient implements LlmClient {
+    /**
+     * Answers a queued script in order, and records what it was asked.
+     *
+     * <p>A {@code ChatModel} rather than a mock, because the assertions here are about the
+     * conversation the generator builds — which turn carries the user's words, which carries the
+     * validator's complaint — and a stub that keeps the prompts is the only way to read that back.
+     */
+    private static final class ScriptedModel implements ChatModel {
         private final Deque<String> answers = new ArrayDeque<>();
-        private final List<ChatRequest> seen = new ArrayList<>();
+        private final List<Prompt> seen = new ArrayList<>();
 
         void willAnswer(String... bodies) {
             answers.addAll(List.of(bodies));
         }
 
         @Override
-        public ChatResponse complete(ChatRequest request) {
-            seen.add(request);
-            return new ChatResponse(answers.isEmpty() ? "" : answers.removeFirst(), "scripted");
-        }
+        public ChatResponse call(Prompt prompt) {
+            // Copied, because the generator extends one list across the repair turn and a stored
+            // reference would show the second call's messages on the first call's record.
+            seen.add(new Prompt(List.copyOf(prompt.getInstructions()), prompt.getOptions()));
 
-        @Override
-        public String name() {
-            return "scripted";
+            String body = answers.isEmpty() ? "" : answers.removeFirst();
+            return new ChatResponse(
+                    List.of(new Generation(new AssistantMessage(body))),
+                    ChatResponseMetadata.builder().model("scripted-model").build());
         }
+    }
+
+    /** The provider behind the scripted model — the name reported beside a generated payload. */
+    private static final ModelProvider SCRIPTED =
+            new ModelProvider() {
+                @Override
+                public String name() {
+                    return "scripted";
+                }
+
+                @Override
+                public boolean available() {
+                    return true;
+                }
+            };
+
+    /** Last message of a recorded prompt, as text. */
+    private static String lastMessage(Prompt prompt) {
+        return prompt.getInstructions().getLast().getText();
     }
 
     private static final Validation VALID = new Validation(true, Validation.Checked.SCHEMA, 100, List.of());
@@ -64,15 +96,21 @@ class PayloadGeneratorTest {
 
     private SpecRegistry registry;
     private MockValidator validator;
-    private ScriptedClient client;
+    private ScriptedModel client;
     private PayloadGenerator generator;
 
     @BeforeEach
     void setUp() {
         registry = mock(SpecRegistry.class);
         validator = mock(MockValidator.class);
-        client = new ScriptedClient();
-        generator = new PayloadGenerator(registry, validator, client, AiProperties.defaults());
+        client = new ScriptedModel();
+        generator =
+                new PayloadGenerator(
+                        registry,
+                        validator,
+                        client,
+                        OpenAiChatOptions.builder().model("scripted-model").build(),
+                        SCRIPTED);
 
         when(registry.findService("petstore"))
                 .thenReturn(Optional.of(new ServiceDescriptor("petstore", "Pet Store", ServiceType.REST, "/p", "spec", List.of())));
@@ -111,7 +149,7 @@ class PayloadGeneratorTest {
 
         generator.generate("petstore", "listPets", "some pets", null);
 
-        String repair = client.seen.get(1).messages().getLast().content();
+        String repair = lastMessage(client.seen.get(1));
         assertThat(repair).contains("/0/id").contains("'x' is not a valid integer");
     }
 
@@ -138,7 +176,7 @@ class PayloadGeneratorTest {
 
         // The final user turn carries the request alone. Anything reading it for intent — a count,
         // most obviously — must not be reading the schema along with it.
-        assertThat(client.seen.getFirst().messages().getLast().content()).isEqualTo("10 pets");
+        assertThat(lastMessage(client.seen.getFirst())).isEqualTo("10 pets");
     }
 
     @Test
@@ -159,13 +197,12 @@ class PayloadGeneratorTest {
         // Carried as context, not as the request: an adjustment must be able to stay one, and the
         // prompt is still the only thing that says whether this is an adjustment at all.
         String context =
-                client.seen.getFirst().messages().stream()
-                        .map(message -> message.content())
+                client.seen.getFirst().getInstructions().stream()
+                        .map(Message::getText)
                         .reduce("", (a, b) -> a + "\n" + b);
 
         assertThat(context).contains("[{\"id\":1}]");
-        assertThat(client.seen.getFirst().messages().getLast().content())
-                .isEqualTo("make three of them cats");
+        assertThat(lastMessage(client.seen.getFirst())).isEqualTo("make three of them cats");
     }
 
     @Test

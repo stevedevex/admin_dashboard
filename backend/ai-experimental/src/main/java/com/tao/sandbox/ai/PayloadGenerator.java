@@ -1,17 +1,23 @@
 package com.tao.sandbox.ai;
 
-import com.tao.sandbox.ai.llm.ChatMessage;
-import com.tao.sandbox.ai.llm.ChatRequest;
-import com.tao.sandbox.ai.llm.ChatResponse;
-import com.tao.sandbox.ai.llm.LlmClient;
-import com.tao.sandbox.ai.llm.ResponseFormat;
+import com.tao.sandbox.ai.llm.ModelProvider;
 import com.tao.sandbox.config.SandboxProperties.ServiceType;
 import com.tao.sandbox.spec.ServiceDescriptor;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.validate.MockValidator;
 import com.tao.sandbox.validate.Validation;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 /**
  * Generating a payload for one operation, and checking it before offering it.
@@ -33,15 +39,29 @@ public class PayloadGenerator {
 
     private final SpecRegistry registry;
     private final MockValidator validator;
-    private final LlmClient client;
-    private final AiProperties properties;
+    private final ChatModel model;
+
+    /**
+     * The endpoint, credential, deployment and temperature every call inherits.
+     *
+     * <p>Carried so each request can be these plus one thing — the schema the answer must satisfy,
+     * which differs per operation — rather than restating the connection on every call.
+     */
+    private final OpenAiChatOptions defaults;
+
+    private final ModelProvider provider;
 
     public PayloadGenerator(
-            SpecRegistry registry, MockValidator validator, LlmClient client, AiProperties properties) {
+            SpecRegistry registry,
+            MockValidator validator,
+            ChatModel model,
+            OpenAiChatOptions defaults,
+            ModelProvider provider) {
         this.registry = registry;
         this.validator = validator;
-        this.client = client;
-        this.properties = properties;
+        this.model = model;
+        this.defaults = defaults;
+        this.provider = provider;
     }
 
     /**
@@ -53,32 +73,33 @@ public class PayloadGenerator {
             String serviceId, String operationId, String prompt, String current) {
         PayloadGenerationRequest request = describe(serviceId, operationId, prompt, current);
 
-        ChatRequest chat =
-                new ChatRequest(
-                        properties.model(),
+        List<Message> conversation =
+                new ArrayList<>(
                         List.of(
-                                ChatMessage.system(systemPrompt(request)),
-                                ChatMessage.system(context(request)),
-                                ChatMessage.user(userPrompt(request))),
-                        properties.temperature(),
-                        responseFormat(request));
+                                new SystemMessage(systemPrompt(request)),
+                                new SystemMessage(context(request)),
+                                new UserMessage(userPrompt(request))));
 
-        ChatResponse answer = client.complete(chat);
-        String body = clean(answer.content());
+        OpenAiChatOptions options = optionsFor(request);
+
+        ChatResponse answer = model.call(new Prompt(conversation, options));
+        String body = clean(contentOf(answer));
         Validation verdict = validator.validate(serviceId, operationId, body);
 
         if (verdict.valid()) {
-            return new PayloadGeneration(body, verdict, 1, client.name(), answer.model());
+            return new PayloadGeneration(body, verdict, 1, provider.name(), modelOf(answer));
         }
 
         // The repair turn. The validator's issues go back verbatim — its wording names the path and
-        // the rule, which is more precise than anything paraphrased here would be.
-        ChatResponse second =
-                client.complete(
-                        chat.continuedWith(
-                                ChatMessage.assistant(body), ChatMessage.user(repairPrompt(verdict))));
+        // the rule, which is more precise than anything paraphrased here would be. The rejected
+        // payload goes with them as the assistant's own turn, so the model is correcting something
+        // it said rather than being handed an unattributed example.
+        conversation.add(new AssistantMessage(body));
+        conversation.add(new UserMessage(repairPrompt(verdict)));
 
-        String repaired = clean(second.content());
+        ChatResponse second = model.call(new Prompt(conversation, options));
+
+        String repaired = clean(contentOf(second));
         Validation repairedVerdict = validator.validate(serviceId, operationId, repaired);
 
         // Keep whichever answer is actually better. Only the repair being valid makes it better:
@@ -86,8 +107,31 @@ public class PayloadGenerator {
         // already been told what was wrong and answered again tends to drift further from the
         // shape, not closer — so the near miss an author can edit is the one worth handing over.
         return repairedVerdict.valid()
-                ? new PayloadGeneration(repaired, repairedVerdict, MAX_ATTEMPTS, client.name(), second.model())
-                : new PayloadGeneration(body, verdict, MAX_ATTEMPTS, client.name(), answer.model());
+                ? new PayloadGeneration(
+                        repaired, repairedVerdict, MAX_ATTEMPTS, provider.name(), modelOf(second))
+                : new PayloadGeneration(body, verdict, MAX_ATTEMPTS, provider.name(), modelOf(answer));
+    }
+
+    /**
+     * The assistant's text, or empty when there is none.
+     *
+     * <p>Absence is answered with empty text rather than an exception: the caller validates whatever
+     * comes back, and an empty payload fails validation with a message an author can read, which is
+     * more use than a null pointer from somewhere inside the response model.
+     */
+    private String contentOf(ChatResponse response) {
+        if (response == null || response.getResult() == null) {
+            return "";
+        }
+
+        AssistantMessage output = response.getResult().getOutput();
+        return output == null || output.getText() == null ? "" : output.getText();
+    }
+
+    /** What actually answered, as reported — a deployment can route somewhere else. */
+    private String modelOf(ChatResponse response) {
+        String reported = response == null ? null : response.getMetadata().getModel();
+        return reported == null || reported.isBlank() ? defaults.getModel() : reported;
     }
 
     /** Resolve what the contract says about this operation, or explain why nothing can be built. */
@@ -129,10 +173,30 @@ public class PayloadGenerator {
                 prompt);
     }
 
-    private ResponseFormat responseFormat(PayloadGenerationRequest request) {
-        return request.format() == PayloadGenerationRequest.Format.JSON
-                ? ResponseFormat.json(request.schema())
-                : ResponseFormat.xml(request.schema());
+    /**
+     * The connection defaults, plus the shape this particular answer must take.
+     *
+     * <p>Structured outputs are the single largest lever on whether generation succeeds: a provider
+     * honouring {@code json_schema} cannot return a payload the schema rejects, which turns the
+     * repair loop into a fallback rather than the main path.
+     *
+     * <p>XSD has no equivalent in any chat API, so an XML request declares no format at all and
+     * relies on the schema being in the prompt — and on the validator to catch what comes back
+     * regardless. Mutating rather than building afresh keeps the endpoint, credential and
+     * deployment attached; a bare options object here would be a request to nowhere.
+     */
+    private OpenAiChatOptions optionsFor(PayloadGenerationRequest request) {
+        if (request.format() != PayloadGenerationRequest.Format.JSON) {
+            return defaults;
+        }
+
+        return defaults.mutate()
+                .responseFormat(
+                        OpenAiChatModel.ResponseFormat.builder()
+                                .type(OpenAiChatModel.ResponseFormat.Type.JSON_SCHEMA)
+                                .jsonSchema(request.schema())
+                                .build())
+                .build();
     }
 
     // --- prompts -----------------------------------------------------------

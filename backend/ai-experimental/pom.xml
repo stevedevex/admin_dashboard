@@ -36,13 +36,20 @@
     </dependency>
 
     <!--
-      A model starter is not declared here on purpose. Which provider to use is a decision for
-      when this module does something, and pulling one in now would commit the project to it and
-      require credentials to build. `spring-ai-client-chat` gives the provider-neutral API.
+      The provider-neutral chat API — ChatModel, Prompt, the message types — and the OpenAI
+      implementation of it. Azure is reached through the latter: as of Spring AI 2.0, the dedicated
+      Azure OpenAI chat module is gone and its own reference page redirects here, because the wire
+      format was always OpenAI's and Azure differs only in where it lives and how you prove who you
+      are.
+
+      The library, deliberately, and not `spring-ai-starter-model-openai`. The starter's
+      auto-configuration builds a ChatModel from its own properties as soon as it is on the
+      classpath, which would undo the one rule this module is built around: with no endpoint
+      configured there is no client, no generator, and nothing that can quietly answer.
     -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
-      <artifactId>spring-ai-client-chat</artifactId>
+      <artifactId>spring-ai-openai</artifactId>
     </dependency>
 
     <!--

@@ -3,7 +3,7 @@ package com.tao.sandbox.ai.control;
 import com.tao.sandbox.ai.AiProperties;
 import com.tao.sandbox.ai.PayloadGeneration;
 import com.tao.sandbox.ai.PayloadGenerator;
-import com.tao.sandbox.ai.llm.LlmClient;
+import com.tao.sandbox.ai.llm.ModelProvider;
 import com.tao.sandbox.control.ControlPanelProblem;
 import java.util.Optional;
 import org.springframework.http.MediaType;
@@ -30,13 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
 class AiController {
 
     private final Optional<PayloadGenerator> generator;
-    private final Optional<LlmClient> client;
+    private final Optional<ModelProvider> provider;
     private final AiProperties properties;
 
     AiController(
-            Optional<PayloadGenerator> generator, Optional<LlmClient> client, AiProperties properties) {
+            Optional<PayloadGenerator> generator, Optional<ModelProvider> provider, AiProperties properties) {
         this.generator = generator;
-        this.client = client;
+        this.provider = provider;
         this.properties = properties;
     }
 
@@ -50,10 +50,10 @@ class AiController {
      */
     @GetMapping(value = "/__tao/ai/status", produces = MediaType.APPLICATION_JSON_VALUE)
     AiStatus status() {
-        boolean ready = generator.isPresent() && client.map(LlmClient::available).orElse(false);
+        boolean ready = generator.isPresent() && provider.map(ModelProvider::available).orElse(false);
 
         return new AiStatus(
-                ready, client.map(LlmClient::name).orElse("none"), properties.model(), reasonWhenUnavailable(ready));
+                ready, provider.map(ModelProvider::name).orElse("none"), properties.model(), reasonWhenUnavailable(ready));
     }
 
     @PostMapping(
@@ -77,7 +77,7 @@ class AiController {
                                         "No model provider is configured. Set tao.sandbox.ai.endpoint (and the"
                                                 + " credentials under tao.sandbox.ai.auth) to enable generation."));
 
-        if (!client.map(LlmClient::available).orElse(false)) {
+        if (!provider.map(ModelProvider::available).orElse(false)) {
             throw ControlPanelProblem.unprocessable(
                     "generator-unavailable",
                     "AI is unavailable",

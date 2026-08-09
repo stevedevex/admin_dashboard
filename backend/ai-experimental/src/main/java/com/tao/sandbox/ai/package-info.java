@@ -55,20 +55,47 @@
  * and was removed: a generator producing schema-shaped placeholder data looks exactly like the
  * feature working, and which one produced a given payload is precisely what a reader cannot
  * establish by looking at it. A capability that is off should be visibly off. So with no {@code
- * tao.sandbox.ai.endpoint} configured there is no {@code LlmClient} and no {@code
+ * tao.sandbox.ai.endpoint} configured there is no {@code ChatModel} and no {@code
  * PayloadGenerator}; the control panel reports the capability unavailable with the reason, and the
  * dashboard disables the action rather than offering one that fails.
  *
- * <h2>Authentication</h2>
+ * <h2>Spring AI does the talking</h2>
  *
- * <p>{@code azure-identity} is a dependency; an Azure OpenAI SDK is not. The wire format is
- * OpenAI's and is spoken over the HTTP client the application already has — what Azure genuinely
- * adds is how a caller proves who it is. Every mode ends at a bearer token for the configured
- * scope, so a service principal on a laptop and a user-assigned managed identity in Azure are the
- * same code path with different environment. See {@code AzureCredentials}.
+ * <p>The chat protocol is not ours. {@code ChatModel}, {@code Prompt}, the message types and
+ * {@code ChatResponse} come from Spring AI, and {@code OpenAiChatModel} speaks the wire format —
+ * this module once carried its own copy of every one of those, plus a hand-written HTTP client that
+ * built the URL and dug {@code choices[0].message.content} out of a map. All of it is gone.
  *
- * <p><strong>Written without connectivity.</strong> {@code AzureOpenAiLlmClient}'s request mapping
- * and response parsing are covered by tests against a stubbed server; no call has been made to a
- * live endpoint. The first real call is the first real test of it.
+ * <p>Azure is reached through the OpenAI model rather than an Azure one because there is no longer
+ * an Azure one: Spring AI published {@code spring-ai-azure-openai} up to 2.0.0-M4 and withdrew it,
+ * and its reference page now redirects to OpenAI chat. What Azure needs is expressed as options —
+ * {@code azure(true)}, a deployment name, and a service version that carries the {@code api-version}
+ * query parameter Azure requires and OpenAI has no concept of.
+ *
+ * <p>The library is declared, not the starter. {@code spring-ai-starter-model-openai} would
+ * auto-configure a {@code ChatModel} as soon as it was on the classpath, which is precisely the
+ * quiet, always-present client this module is designed not to have.
+ *
+ * <h2>What is still ours</h2>
+ *
+ * <p>Two things Spring AI does not cover:
+ *
+ * <ul>
+ *   <li><strong>Authentication.</strong> {@code azure-identity} chooses a credential from
+ *       configuration — a service principal on a laptop, a user-assigned managed identity in Azure —
+ *       and every mode ends at a bearer token for the configured scope. It reaches the SDK as a
+ *       credential that fetches a token per call, because Entra tokens expire within the hour and
+ *       one read at startup would work in every test and fail in the afternoon. See {@code
+ *       AzureCredentials} and {@code AzureModelAccess}.
+ *   <li><strong>Asking whether it would work.</strong> {@code ModelProvider} answers what the
+ *       provider is called and whether a call could succeed right now. A {@code ChatModel} is a way
+ *       to call a model, not a way to ask about one, and the control panel needs the second so it
+ *       can disable an action rather than offer a button that throws.
+ * </ul>
+ *
+ * <p><strong>Still unverified against a live endpoint.</strong> No call has been made to a real
+ * Azure deployment. Less of the untested surface is ours than it was — the request mapping and
+ * response parsing now belong to Spring AI and the OpenAI SDK — but the configuration that points
+ * them at Azure has not been proven, and the first real call is the first real test of it.
  */
 package com.tao.sandbox.ai;
