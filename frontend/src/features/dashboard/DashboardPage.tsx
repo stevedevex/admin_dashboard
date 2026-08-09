@@ -35,6 +35,17 @@ export function DashboardPage() {
   const facts = summary.status === 'ready' ? summary.data : null;
   const problems = facts === null ? 0 : facts.invalidCount + facts.incompleteCount;
 
+  /**
+   * How many mocks anything has actually looked at.
+   *
+   * The invalid and incomplete counts are silent about this, and their silence is loudest exactly
+   * when it matters: verdicts live in memory and are only written by a validation running, so a
+   * restarted sandbox reports zero of each — the same numbers a library checked end to end and
+   * found clean reports. Every zero below therefore says which of the two it is.
+   */
+  const checked = facts === null ? 0 : facts.mockCount - facts.uncheckedCount;
+  const clean = checked === 0 ? 'nothing checked yet' : `none of ${checked} checked`;
+
   const serving =
     facts !== null && scenarios.status === 'ready'
       ? (scenarios.data.find((scenario) => scenario.id === facts.activeScenarioId) ?? null)
@@ -66,17 +77,14 @@ export function DashboardPage() {
     {
       label: 'Invalid',
       value: facts === null ? '—' : String(facts.invalidCount),
-      note: facts === null || facts.invalidCount === 0 ? 'none failing schema' : 'failing schema',
+      note: facts === null ? '' : facts.invalidCount === 0 ? clean : 'failing schema',
       attention: facts !== null && facts.invalidCount > 0,
       to: '/mock-data/mocks',
     },
     {
       label: 'Incomplete',
       value: facts === null ? '—' : String(facts.incompleteCount),
-      note:
-        facts === null || facts.incompleteCount === 0
-          ? 'none partially filled'
-          : 'partially filled',
+      note: facts === null ? '' : facts.incompleteCount === 0 ? clean : 'partially filled',
       attention: facts !== null && facts.incompleteCount > 0,
       to: '/mock-data/mocks',
     },

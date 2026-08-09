@@ -44,6 +44,7 @@ type WireSummary = {
   mockCount: number;
   invalidCount: number;
   incompleteCount: number;
+  uncheckedCount: number;
   largestMockBytes: number;
 };
 

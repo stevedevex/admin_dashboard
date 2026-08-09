@@ -124,6 +124,14 @@ export type MockDataSummary = {
   mockCount: number;
   invalidCount: number;
   incompleteCount: number;
+  /**
+   * How many mocks nothing has validated — the denominator the other two counts are missing.
+   *
+   * Verdicts are remembered in memory and only ever written by a validation actually running, so a
+   * restarted sandbox reports every mock unchecked and both other counts zero. Without this, that
+   * is indistinguishable from a library checked end to end and found clean.
+   */
+  uncheckedCount: number;
   largestMockBytes: number;
 };
 

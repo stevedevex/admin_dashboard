@@ -9,6 +9,12 @@ package com.tao.sandbox.control.view;
  * @param mockCount mocks owned across all scenarios — inherited visibility is not double-counted
  * @param invalidCount among mocks validation has actually assessed; an unchecked mock counts in
  *     neither bucket, because nothing is known about it
+ * @param uncheckedCount how many that exclusion covers, which is what makes the other two counts
+ *     readable. Verdicts are remembered in memory and populated only by validation actually
+ *     happening, so after a restart every mock is unchecked and both buckets are zero — and a zero
+ *     that means "nobody has looked" must not be reported the same way as one that means "we
+ *     looked and found none". Sending the denominator is the server's job for the same reason
+ *     sending the counts is: the dashboard cannot derive it without listing the whole library.
  */
 public record SummaryView(
         int serviceCount,
@@ -18,4 +24,5 @@ public record SummaryView(
         int mockCount,
         int invalidCount,
         int incompleteCount,
+        int uncheckedCount,
         long largestMockBytes) {}

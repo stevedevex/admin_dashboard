@@ -60,6 +60,7 @@ class StatusController {
         int mockCount = 0;
         int invalid = 0;
         int incomplete = 0;
+        int unchecked = 0;
         long largest = 0;
 
         for (Scenario scenario : repository.scenarios()) {
@@ -75,6 +76,9 @@ class StatusController {
                     invalid++;
                 } else if ("incomplete".equals(state)) {
                     incomplete++;
+                } else if (MockStates.UNCHECKED.equals(state)) {
+                    // Counted, not ignored: it is what the other two counts are silent about.
+                    unchecked++;
                 }
             }
         }
@@ -87,6 +91,7 @@ class StatusController {
                 mockCount,
                 invalid,
                 incomplete,
+                unchecked,
                 largest);
     }
 

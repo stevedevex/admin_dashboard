@@ -80,6 +80,31 @@ class ControlPanelApiTest {
                 bytes -> assertThat(bytes.longValue()).isGreaterThan(0));
     }
 
+    /**
+     * Nothing has validated anything in a freshly started sandbox, which is exactly when the
+     * invalid and incomplete counts read zero. Reporting how many are unchecked is what keeps those
+     * two zeros from being read as a clean bill of health.
+     *
+     * <p>Reloaded first because verdicts live in a bean shared with every other test sharing this
+     * context, and a reload clears them — which is the same thing a restart does, and the state
+     * this assertion is about.
+     */
+    @Test
+    void theSummaryReportsHowManyMocksNothingHasChecked() {
+        assertThat(mvc.post().uri("/__tao/reload").exchange()).hasStatusOk();
+
+        MvcTestResult result = mvc.get().uri("/__tao/summary").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.invalidCount").isEqualTo(0);
+        assertThat(result).bodyJson().extractingPath("$.incompleteCount").isEqualTo(0);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.uncheckedCount")
+                .asNumber()
+                .satisfies(count -> assertThat(count.intValue()).isGreaterThan(10));
+    }
+
     /** hasSchema and the mock count are server decisions the dashboard must not re-derive. */
     @Test
     void servicesCarrySchemaAvailabilityFormatAndMockCount() {
