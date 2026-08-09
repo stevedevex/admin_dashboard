@@ -177,3 +177,15 @@
   font-size: var(--tao-text-xs);
   color: var(--tao-text-muted);
 }
+
+/* The product, at icon size. Only shown collapsed, where the full name does not fit. */
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-weight: 700;
+  font-size: var(--tao-text-sm);
+  color: var(--tao-accent);
+}

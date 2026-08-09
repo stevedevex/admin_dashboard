@@ -15,7 +15,7 @@
 }
 
 .neutral {
-  background: var(--tao-neutral-100);
+  background: var(--tao-chip);
   color: var(--tao-text-muted);
 }
 .info {

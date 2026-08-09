@@ -37,6 +37,16 @@
   --tao-info: #1c5b91;
   --tao-info-subtle: #e7f0f7;
 
+  /* --- Solid fills ------------------------------------------------------ */
+  /* A high-contrast fill and a quiet chip. Both are semantic rather than palette entries
+     precisely so they invert with the theme: components reaching straight for `--tao-neutral-800`
+     stayed dark-on-dark when the dark palette arrived, which is how a primary button becomes
+     invisible and a tag becomes a pale smudge. */
+  --tao-solid: var(--tao-neutral-800);
+  --tao-solid-hover: var(--tao-neutral-900);
+  --tao-solid-text: var(--tao-neutral-0);
+  --tao-chip: var(--tao-neutral-100);
+
   /* --- Semantic surfaces ----------------------------------------------- */
   --tao-bg: var(--tao-neutral-100);
   --tao-surface: var(--tao-neutral-0);
@@ -90,6 +100,11 @@
   --tao-text: var(--tao-neutral-100);
   --tao-text-muted: var(--tao-neutral-400);
   --tao-text-inverse: var(--tao-neutral-900);
+
+  --tao-solid: var(--tao-neutral-100);
+  --tao-solid-hover: var(--tao-neutral-0);
+  --tao-solid-text: var(--tao-neutral-900);
+  --tao-chip: #2e2e2e;
 
   --tao-accent-subtle: #2a1013;
   --tao-ok-subtle: #16241a;
