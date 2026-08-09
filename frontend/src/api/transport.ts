@@ -1,10 +1,12 @@
 import type {
+  AiStatus,
   MockContent,
   MockDataSummary,
   MockDraft,
   MockName,
   MockSummary,
   OperationSchema,
+  PayloadGeneration,
   RequestDetail,
   RequestPage,
   ResolutionTrace,
@@ -85,6 +87,15 @@ export type Transport = {
   saveMock(id: string, body: string, options?: { request?: string }): Promise<MockContent>;
 
   /**
+   * Remove a mock and its sidecars.
+   *
+   * Sends the ETag the file was read with, so deleting something a colleague changed underneath
+   * fails loudly rather than discarding their work — the same protection `saveMock` has, for the
+   * operation where losing the race is least recoverable.
+   */
+  deleteMock(id: string): Promise<void>;
+
+  /**
    * The mock a recorded call is asking for: where it would live, what it would be called, and an
    * empty payload shaped like the declared response.
    *
@@ -122,6 +133,33 @@ export type Transport = {
 
   /** One entry with its bodies and full resolution trace. */
   getRequest(id: string): Promise<RequestDetail | null>;
+
+  /**
+   * Whether payload generation is available, and which provider would answer.
+   *
+   * Asked before the action is offered. A button that fails on click teaches people the feature
+   * is broken, which is more expensive than a button that was never drawn.
+   */
+  getAiStatus(): Promise<AiStatus>;
+
+  /**
+   * Ask for a payload for one operation, generated against its contract and checked against it.
+   *
+   * A read: nothing is created, exactly like {@link draftFromRequest}. What comes back is a
+   * proposal and a verdict, and saving it is the ordinary save an author makes after reading it.
+   *
+   * @param prompt what is wanted in words — how many records, which fields matter. Optional;
+   *   absent means a representative, fully populated response.
+   * @param current what the editor already holds, sent as context so a request that is really
+   *   an adjustment to what is already there can be answered by adjusting it rather than by
+   *   inventing a replacement. Which of the two it is, is the model's judgement to make.
+   */
+  generatePayload(
+    serviceId: string,
+    operationId: string,
+    prompt?: string,
+    current?: string,
+  ): Promise<PayloadGeneration>;
 
   /**
    * Re-read the mock library from the underlying store.

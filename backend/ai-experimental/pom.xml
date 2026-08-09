@@ -24,6 +24,18 @@
     </dependency>
 
     <!--
+      Generation needs the parsed contracts and the validator, both of which are stable public API
+      of the mock library: SpecRegistry supplies the schema a payload must satisfy, and
+      MockValidator is what decides whether the generated one does. Depending on the library is
+      the plain answer — see the note in ai/package-info.java, which posed this and now records it.
+    -->
+    <dependency>
+      <groupId>com.tao</groupId>
+      <artifactId>tao-sandbox-mock-data</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!--
       A model starter is not declared here on purpose. Which provider to use is a decision for
       when this module does something, and pulling one in now would commit the project to it and
       require credentials to build. `spring-ai-client-chat` gives the provider-neutral API.
@@ -31,6 +43,17 @@
     <dependency>
       <groupId>org.springframework.ai</groupId>
       <artifactId>spring-ai-client-chat</artifactId>
+    </dependency>
+
+    <!--
+      Identity only — not an Azure OpenAI SDK. The wire format is OpenAI's and is spoken over the
+      HTTP client this application already has; what Azure genuinely adds is how a caller proves
+      who it is, and that is worth a library rather than a hand-rolled OAuth exchange. It is also
+      what makes a service principal locally and a managed identity in Azure the same code path.
+    -->
+    <dependency>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-identity</artifactId>
     </dependency>
   </dependencies>
 </project>

@@ -7,13 +7,13 @@
 }
 
 /*
- * Request over response. The response still gets the larger share — it is the payload — but the
- * request is no longer a bare text box: it carries a verb, a path, and the resolution trace
- * underneath, and a row sized for one line left all three fighting for it.
+ * The dry run sits above the payload and takes only what it is using — one toolbar at rest, more
+ * while an envelope is on screen. `auto` rather than a share of the column: this is a diagnostic
+ * reached for occasionally, and the payload is the work surface, so the payload gets the rest.
  */
 .editor {
   display: grid;
-  grid-template-rows: minmax(220px, 38%) 1fr;
+  grid-template-rows: auto 1fr;
   gap: var(--tao-space-4);
   min-height: 0;
 }
@@ -29,4 +29,16 @@
   .layout {
     grid-template-columns: 1fr;
   }
+}
+
+.filter {
+  padding: var(--tao-space-2) var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+}
+
+/* How much is being hidden, said in the header rather than discovered by scrolling. */
+.filterCount {
+  font-size: var(--tao-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--tao-text-muted);
 }

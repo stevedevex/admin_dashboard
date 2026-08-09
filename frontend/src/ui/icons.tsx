@@ -1,10 +1,13 @@
 import {
   AlertTriangle,
+  Sparkles,
+  Trash2,
   Check,
   CheckCircle2,
   ArrowLeftRight,
   ChevronDown,
   ChevronRight,
+  CircleDashed,
   CirclePlus,
   Clock,
   FileCode2,
@@ -13,7 +16,6 @@ import {
   HelpCircle,
   Layers,
   LayoutGrid,
-  MinusCircle,
   MoreVertical,
   PanelLeft,
   RefreshCw,
@@ -49,8 +51,12 @@ const registry = {
 
   // Actions
   reload: RefreshCw,
+  // Sparkles is the settled convention for model-assisted actions; a reader recognises it
+  // without a label, which is what keeps the button honest about what it is.
+  ai: Sparkles,
   create: CirclePlus,
   save: Save,
+  delete: Trash2,
   validate: Check,
 
   // Tree
@@ -64,7 +70,10 @@ const registry = {
   ok: CheckCircle2,
   warn: AlertTriangle,
   error: XCircle,
-  unknown: MinusCircle,
+  /* Dashed, not a minus in a circle: this marks a thing not yet assessed, and circle-minus is
+     the near-universal glyph for remove — readers took it for a delete control that does not
+     exist on the row. A status must not look like an action. */
+  unknown: CircleDashed,
 } as const;
 
 export type IconName = keyof typeof registry;

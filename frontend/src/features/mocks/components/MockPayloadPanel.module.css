@@ -1,0 +1,126 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+  background: var(--tao-surface-sunken);
+}
+
+.editor {
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * Two groups, not one row. Authoring aids sit left; everything that acts on the draft — abandon
+ * it, check it, commit it — sits right in that order, so the destructive one is furthest from the
+ * primary and nothing lands under a cursor already moving towards Save.
+ */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tao-space-4);
+  padding: var(--tao-space-3) var(--tao-space-4);
+  border-top: 1px solid var(--tao-border);
+}
+
+.assist {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  /* Holds the right group in place when the left one is absent. */
+  margin-left: auto;
+}
+
+.error {
+  font-size: var(--tao-text-xs);
+  color: var(--tao-error);
+}
+
+/*
+ * Reads as the tag it replaced, but it acts: the stored call goes to the panel above. Styled as a
+ * tag rather than a button because it sits in a row of them, and looking like a control it is not
+ * beside would be the more confusing lie.
+ */
+.provenance {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-1);
+  padding: 2px var(--tao-space-2);
+  font: inherit;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-info);
+  background: var(--tao-info-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--tao-radius-sm);
+  cursor: pointer;
+}
+
+.provenance:hover {
+  border-color: var(--tao-info);
+}
+
+.provenance:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: 1px;
+}
+
+/* Pushed to the far end of the meta strip, away from everything that commits. */
+.destructive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-1);
+  margin-left: auto;
+  padding: 2px var(--tao-space-2);
+  font: inherit;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--tao-radius-sm);
+  cursor: pointer;
+}
+
+.destructive:hover:not(:disabled) {
+  color: var(--tao-error);
+  border-color: var(--tao-error);
+}
+
+.destructive:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.destructive:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: 1px;
+}
+
+.confirm {
+  margin: 0;
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.confirmNote {
+  margin: var(--tao-space-3) 0 0;
+  font-size: var(--tao-text-xs);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}

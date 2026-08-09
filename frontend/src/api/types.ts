@@ -149,6 +149,44 @@ export type ValidationResult = {
 };
 
 /**
+ * Whether payload generation can be offered, and by what.
+ *
+ * `generator` is displayed, not merely recorded: what produced a payload is the one thing a
+ * reader cannot establish by looking at it.
+ *
+ * @param reason why it cannot be used, or null when it can. Two unavailabilities need telling
+ *   apart — nothing configured, and configured but unreachable — because only one is fixed by
+ *   editing configuration, and a single "unavailable" sends people to the wrong one.
+ */
+export type AiStatus = {
+  available: boolean;
+  generator: string;
+  model: string;
+  reason: string | null;
+};
+
+/**
+ * A payload a model proposed for an operation, and the sandbox's verdict on it.
+ *
+ * Nothing is written by asking for this. The body arrives in the editor as a draft like any
+ * other, and saving is the same deliberate action it always was.
+ *
+ * @param validation from the same validator the Validate button uses, so the two can never
+ *   disagree. Returned whatever it says: a payload that failed is still worth showing, because
+ *   the issues are what an author fixes — but it must never be presented as verified when
+ *   `checked` is not `schema`.
+ * @param attempts model calls it took, so a loop repairing on every request is visible rather
+ *   than merely slow
+ */
+export type PayloadGeneration = {
+  body: string;
+  validation: ValidationResult;
+  attempts: number;
+  generator: string;
+  model: string;
+};
+
+/**
  * A request described rather than sent.
  *
  * Two shapes, because the protocols identify an operation differently: REST is described, since

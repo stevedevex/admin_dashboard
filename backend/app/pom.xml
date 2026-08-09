@@ -22,6 +22,12 @@
       <version>${project.version}</version>
     </dependency>
 
+    <dependency>
+      <groupId>com.tao</groupId>
+      <artifactId>tao-sandbox-ai-experimental</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
     <!-- Swagger UI over the control-panel API. Lives here, not in a feature module: what is
          documented is the running application, whichever features it happens to be composed of. -->
     <dependency>
