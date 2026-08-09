@@ -690,6 +690,38 @@ class ControlPanelWriteTest {
     }
 
     /**
+     * A skeleton has to be valid where it lands, so it must read elementFormDefault from the file
+     * that declares it — userservice keeps its schema in a sibling .xsd, while the WSDL's own
+     * inline fragment shares the namespace and declares nothing.
+     */
+    @Test
+    void theSkeletonPutsChildrenInTheNamespaceTheSchemaAsksFor() throws Exception {
+        mvc.post()
+                .uri("/soap/userservice")
+                .contentType(MediaType.TEXT_XML)
+                .content(
+                        """
+                        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body>\
+                        <us:GetUserRequest xmlns:us="http://example.org"><us:UserId>00004242</us:UserId>\
+                        </us:GetUserRequest></soapenv:Body></soapenv:Envelope>""")
+                .exchange();
+
+        MvcTestResult page = mvc.get().uri("/__tao/requests").exchange();
+        MvcTestResult draft = mvc.get().uri("/__tao/requests/" + cursorOf(page) + "/draft").exchange();
+
+        // Zero-padding is stripped, exactly as extraction strips it, so the file is reachable.
+        assertThat(draft)
+                .bodyJson()
+                .extractingPath("$.mockId")
+                .isEqualTo("baseline/userservice/GetUser/userid=4242.xml");
+
+        String skeleton = draft.getResponse().getContentAsString();
+        assertThat(skeleton).contains("GetUserResponse").contains("Name");
+        // Qualified: no child may push itself out of the namespace it is declared in.
+        assertThat(skeleton).doesNotContain("xmlns=\\\"\\\"");
+    }
+
+    /**
      * The call that motivated a mock is stored beside it — and stays there through later edits,
      * since every ordinary save carries no request and clearing on those would throw the record
      * away the first time anyone touched the payload.

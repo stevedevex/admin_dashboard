@@ -160,10 +160,24 @@ public record SoapSchemas(
         }
     }
 
+    /**
+     * The first document of this namespace that actually declares the attribute — not simply the
+     * first document of this namespace.
+     *
+     * <p>A namespace is routinely split across files, and the piece the WSDL carries inline is
+     * often nothing but an {@code <xsd:include>} of the file that holds the real declarations. It
+     * matches the namespace and declares nothing, so taking it would read "unqualified" for a
+     * schema whose own file says qualified — and every generated skeleton would carry
+     * {@code xmlns=""} on children that belong in the namespace.
+     *
+     * <p>Absent everywhere means unqualified, which is what XSD itself defaults to.
+     */
     private String elementFormDefaultOf(String namespace) {
         for (Document document : documents) {
             Element schema = document.getDocumentElement();
-            if (schema != null && namespace.equals(schema.getAttribute("targetNamespace"))) {
+            if (schema != null
+                    && namespace.equals(schema.getAttribute("targetNamespace"))
+                    && !schema.getAttribute("elementFormDefault").isBlank()) {
                 return schema.getAttribute("elementFormDefault");
             }
         }
