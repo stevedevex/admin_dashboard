@@ -84,7 +84,8 @@ class ServiceCatalogController {
         }
 
         if (registry.findRest(serviceId, operationId).isPresent()) {
-            return SchemaView.json(registry.findResponseSchema(serviceId, operationId).orElse(null));
+            String declared = registry.findResponseSchema(serviceId, operationId).orElse(null);
+            return SchemaView.json(declared, Skeletons.fromJsonSchema(declared));
         }
 
         return registry
@@ -95,8 +96,9 @@ class ServiceCatalogController {
                                         schemas.documentFor(operationId).orElse(null),
                                         schemas.unavailable() != null
                                                 ? schemas.unavailable()
-                                                : "The WSDL declares no response element for this operation"))
-                .orElseGet(() -> SchemaView.xsd(null, "No schema was read for this service"));
+                                                : "The WSDL declares no response element for this operation",
+                                        schemas.skeleton(operationId).orElse(null)))
+                .orElseGet(() -> SchemaView.xsd(null, "No schema was read for this service", null));
     }
 
     /** Naming the alternatives turns a typo into a correction rather than an investigation. */

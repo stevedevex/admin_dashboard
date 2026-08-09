@@ -162,6 +162,7 @@ class RequestLogController {
                 .orElse("xml");
     }
 
+    /** The same skeleton {@code /services/…/schema} offers; one source, so the two cannot differ. */
     private String skeletonFor(String serviceId, String operationId) {
         if (registry.findRest(serviceId, operationId).isPresent()) {
             return Skeletons.fromJsonSchema(registry.findResponseSchema(serviceId, operationId).orElse(null));
