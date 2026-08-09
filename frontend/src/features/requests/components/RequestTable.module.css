@@ -123,3 +123,7 @@
     display: none;
   }
 }
+
+.muted {
+  color: var(--tao-text-muted);
+}

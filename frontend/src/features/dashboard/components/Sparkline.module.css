@@ -8,12 +8,27 @@
   border-bottom: 1px solid var(--tao-border);
 }
 
+/*
+ * Every slice carries a faint stub at the baseline, so a quiet window reads as a chart of zeroes
+ * rather than as a panel that failed to draw. Bars sit on top of it.
+ */
 .slot {
+  position: relative;
   display: flex;
   align-items: flex-end;
   flex: 1 1 0;
   min-width: 0;
   height: 100%;
+}
+
+.slot::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--tao-border);
 }
 
 .bar {

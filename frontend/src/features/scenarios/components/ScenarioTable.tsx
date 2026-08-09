@@ -51,7 +51,7 @@ export function ScenarioTable({ scenarios, activeId, switching, onServe }: Scena
                   </Tag>
                 ) : (
                   <Button
-                    emphasis="secondary"
+                    emphasis="muted"
                     disabled={switching !== null || activeId === null}
                     onClick={() => onServe(scenario.id)}
                   >

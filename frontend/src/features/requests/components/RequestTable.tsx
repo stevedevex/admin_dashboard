@@ -43,7 +43,11 @@ export function RequestTable({ entries, selectedId, onSelect }: RequestTableProp
                   <span className={styles.mono}>{entry.status}</span>
                 )}
               </td>
-              <td className={`${styles.took} ${styles.numeric}`}>{entry.tookMillis} ms</td>
+              {/* Sub-millisecond is the normal case for a mock served from memory, and a column
+                  of "0 ms" is a column of noise. Shown when there is something to notice. */}
+              <td className={`${styles.took} ${styles.numeric}`}>
+                {entry.tookMillis > 0 ? `${entry.tookMillis} ms` : <span className={styles.muted}>—</span>}
+              </td>
               <td className={styles.answered}>
                 {entry.matched ? (
                   <span className={styles.mono} title={entry.matched}>
