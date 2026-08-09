@@ -18,7 +18,7 @@ export function ScenarioTable({ scenarios, activeId, switching, onServe }: Scena
         <tr>
           <th>Scenario</th>
           <th>Inherits</th>
-          <th>Services</th>
+          <th className={styles.numeric}>Services</th>
           <th className={styles.numeric}>Mocks</th>
           <th className={styles.serving}>Serving</th>
         </tr>
