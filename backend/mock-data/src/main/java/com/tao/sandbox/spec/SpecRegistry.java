@@ -171,6 +171,20 @@ public class SpecRegistry {
     }
 
     /**
+     * Whether validation has anything to check this service's payloads against — a compiled XSD
+     * for SOAP, at least one declared response schema for REST. The dashboard renders this as a
+     * fact per service; computing it client-side would mean the client re-deriving what
+     * "checkable" means.
+     */
+    public boolean hasSchema(String serviceId) {
+        SoapServiceDefinition soap = soapByService.get(serviceId);
+        if (soap != null) {
+            return soap.schemas() != null && soap.schemas().compiled().isPresent();
+        }
+        return responseSchemas.keySet().stream().anyMatch(key -> key.startsWith(serviceId + "/"));
+    }
+
+    /**
      * The success response's schema, for operations whose contract declares one.
      *
      * <p>Empty is a normal answer, not a fault: a WSDL's response schema is not extracted yet, and

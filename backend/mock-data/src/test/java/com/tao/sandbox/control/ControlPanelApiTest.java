@@ -38,6 +38,63 @@ class ControlPanelApiTest {
         assertThat(result).bodyJson().extractingPath("$.root").asString().endsWith("mocks");
     }
 
+    /** One call for the dashboard's headline numbers; counting is the server's job. */
+    @Test
+    void theSummaryCarriesTheDashboardsHeadlineNumbers() {
+        MvcTestResult result = mvc.get().uri("/__tao/summary").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.serviceCount").isEqualTo(5);
+        assertThat(result).bodyJson().extractingPath("$.scenarioCount").isEqualTo(3);
+        assertThat(result).bodyJson().extractingPath("$.activeScenarioId").isEqualTo("baseline");
+        assertThat(result).bodyJson().extractingPath("$.mockCount").asNumber().satisfies(
+                count -> assertThat(count.intValue()).isGreaterThan(10));
+        assertThat(result).bodyJson().extractingPath("$.largestMockBytes").asNumber().satisfies(
+                bytes -> assertThat(bytes.longValue()).isGreaterThan(0));
+    }
+
+    /** hasSchema and the mock count are server decisions the dashboard must not re-derive. */
+    @Test
+    void servicesCarrySchemaAvailabilityFormatAndMockCount() {
+        MvcTestResult result = mvc.get().uri("/__tao/services").exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='petstore')].hasSchema")
+                .asArray()
+                .containsExactly(true);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='petstore')].format")
+                .asArray()
+                .containsExactly("json");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='stockquote')].format")
+                .asArray()
+                .containsExactly("xml");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='petstore')].mockCount")
+                .asArray()
+                .satisfies(counts -> assertThat(((Number) counts[0]).intValue()).isGreaterThan(0));
+    }
+
+    /** serviceIds says what a scenario covers, so inherited coverage counts. */
+    @Test
+    void scenariosNameTheServicesTheyCover() {
+        MvcTestResult result = mvc.get().uri("/__tao/scenarios").exchange();
+
+        assertThat(result).hasStatusOk();
+        // empty-results owns two mocks but covers everything baseline covers.
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[?(@.id=='empty-results')].serviceIds[*]")
+                .asArray()
+                .contains("petstore", "stockquote", "calculator");
+    }
+
     /** The client team fetches what they integrate against from the same host they call. */
     @Test
     void theDroppedInContractIsServedVerbatim() throws Exception {

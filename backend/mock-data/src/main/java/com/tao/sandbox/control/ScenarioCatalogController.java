@@ -38,16 +38,7 @@ class ScenarioCatalogController {
 
     @GetMapping
     List<ScenarioView> scenarios() {
-        return repository.scenarios().stream()
-                .map(
-                        scenario ->
-                                new ScenarioView(
-                                        scenario.id(),
-                                        scenario.name(),
-                                        scenario.description(),
-                                        scenario.parent(),
-                                        ownedMockCount(scenario.id())))
-                .toList();
+        return repository.scenarios().stream().map(this::describe).toList();
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -67,14 +58,7 @@ class ScenarioCatalogController {
             throw ControlPanelProblem.unprocessable("unusable-parent", "Cannot extend that", e.getMessage());
         }
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(
-                        new ScenarioView(
-                                created.id(),
-                                created.name(),
-                                created.description(),
-                                created.parent(),
-                                ownedMockCount(created.id())));
+        return ResponseEntity.status(HttpStatus.CREATED).body(describe(created));
     }
 
     /**
@@ -102,12 +86,7 @@ class ScenarioCatalogController {
 
         activeScenario.set(scenario.id());
 
-        return new ScenarioView(
-                scenario.id(),
-                scenario.name(),
-                scenario.description(),
-                scenario.parent(),
-                ownedMockCount(scenario.id()));
+        return describe(scenario);
     }
 
     @DeleteMapping("/{id}")
@@ -133,6 +112,25 @@ class ScenarioCatalogController {
         states.clear();
 
         return ResponseEntity.noContent().build();
+    }
+
+    private ScenarioView describe(Scenario scenario) {
+        return new ScenarioView(
+                scenario.id(),
+                scenario.name(),
+                scenario.description(),
+                scenario.parent(),
+                ownedMockCount(scenario.id()),
+                serviceIdsIn(scenario.id()));
+    }
+
+    /** Services with a mock visible here, inherited included — what the scenario covers. */
+    private List<String> serviceIdsIn(String scenarioId) {
+        return repository.list(scenarioId, null).stream()
+                .map(mock -> mock.id().serviceId())
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     /**

@@ -2,9 +2,12 @@ package com.tao.sandbox.control;
 
 import com.tao.sandbox.config.SandboxProperties;
 import com.tao.sandbox.control.view.SandboxStatus;
+import com.tao.sandbox.control.view.SummaryView;
 import com.tao.sandbox.runtime.resolve.ActiveScenario;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockRepository;
+import com.tao.sandbox.store.MockSummary;
+import com.tao.sandbox.store.Scenario;
 import com.tao.sandbox.validate.MockStates;
 import java.util.List;
 import org.springframework.http.MediaType;
@@ -46,6 +49,45 @@ class StatusController {
     @GetMapping("/status")
     SandboxStatus status() {
         return describe();
+    }
+
+    /** Headline numbers for the dashboard, in one call. See {@link SummaryView}. */
+    @GetMapping("/summary")
+    SummaryView summary() {
+        int withoutSchema =
+                (int) registry.services().stream().filter(service -> !registry.hasSchema(service.id())).count();
+
+        int mockCount = 0;
+        int invalid = 0;
+        int incomplete = 0;
+        long largest = 0;
+
+        for (Scenario scenario : repository.scenarios()) {
+            for (MockSummary mock : repository.list(scenario.id(), null)) {
+                if (mock.inherited()) {
+                    continue; // owned elsewhere; counting it here would double-count the file
+                }
+                mockCount++;
+                largest = Math.max(largest, mock.sizeBytes());
+
+                String state = states.get(mock.id()).state();
+                if ("invalid".equals(state)) {
+                    invalid++;
+                } else if ("incomplete".equals(state)) {
+                    incomplete++;
+                }
+            }
+        }
+
+        return new SummaryView(
+                registry.services().size(),
+                withoutSchema,
+                repository.scenarios().size(),
+                activeScenario.get(),
+                mockCount,
+                invalid,
+                incomplete,
+                largest);
     }
 
     /**

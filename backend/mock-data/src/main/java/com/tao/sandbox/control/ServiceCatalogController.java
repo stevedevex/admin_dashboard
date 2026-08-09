@@ -1,8 +1,11 @@
 package com.tao.sandbox.control;
 
 import com.tao.sandbox.control.view.SchemaView;
+import com.tao.sandbox.control.view.ServiceView;
+import com.tao.sandbox.runtime.resolve.ActiveScenario;
 import com.tao.sandbox.spec.ServiceDescriptor;
 import com.tao.sandbox.spec.SpecRegistry;
+import com.tao.sandbox.store.MockRepository;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,19 +20,32 @@ import org.springframework.web.bind.annotation.RestController;
 class ServiceCatalogController {
 
     private final SpecRegistry registry;
+    private final MockRepository repository;
+    private final ActiveScenario activeScenario;
 
-    ServiceCatalogController(SpecRegistry registry) {
+    ServiceCatalogController(
+            SpecRegistry registry, MockRepository repository, ActiveScenario activeScenario) {
         this.registry = registry;
+        this.repository = repository;
+        this.activeScenario = activeScenario;
     }
 
     /**
-     * Returned straight from the registry: {@link ServiceDescriptor} was written as the
-     * control-plane shape, so a view record here would only be a second place for the two to
-     * disagree.
+     * The registry's descriptor, carried whole inside {@link ServiceView} — plus the facts that
+     * live outside the registry: the mock count comes from the store, and both it and
+     * {@code hasSchema} are server decisions the dashboard must not re-derive.
      */
     @GetMapping
-    List<ServiceDescriptor> services() {
-        return registry.services();
+    List<ServiceView> services() {
+        String scenario = activeScenario.get();
+        return registry.services().stream()
+                .map(
+                        service ->
+                                ServiceView.of(
+                                        service,
+                                        registry.hasSchema(service.id()),
+                                        repository.list(scenario, service.id()).size()))
+                .toList();
     }
 
     /**
