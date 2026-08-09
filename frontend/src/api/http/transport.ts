@@ -1,4 +1,5 @@
 import type {
+  AiStatus,
   MockContent,
   MockDataSummary,
   MockDraft,
@@ -9,6 +10,7 @@ import type {
   RequestDetail,
   RequestEntry,
   OperationSchema,
+  PayloadGeneration,
   RequestPage,
   ResolutionTrace,
   ResolveRequest,
@@ -118,6 +120,15 @@ type WireRequestDetail = WireRequestEntry & {
 };
 
 type WireRequestPage = { mode: string; cursor: string; entries: WireRequestEntry[] };
+
+/** `AiStatus` needs no translation: the server already names these as the domain does. */
+type WirePayloadGeneration = {
+  body: string;
+  validation: WireValidation;
+  attempts: number;
+  generator: string;
+  model: string;
+};
 
 type WireValidation = {
   valid: boolean;
@@ -346,6 +357,26 @@ export const httpTransport: Transport = {
     return toValidation(wire);
   },
 
+  async getAiStatus(): Promise<AiStatus> {
+    return request<AiStatus>('/ai/status');
+  },
+
+  async generatePayload(
+    serviceId: string,
+    operationId: string,
+    prompt?: string,
+    current?: string,
+  ): Promise<PayloadGeneration> {
+    const wire = await request<WirePayloadGeneration>('/ai/payload', {
+      method: 'POST',
+      body: { serviceId, operationId, prompt: prompt ?? null, current: current || null },
+    });
+
+    // The verdict goes through the same translation as every other one, so a generated payload and
+    // a hand-typed one are described in identical terms on screen.
+    return { ...wire, validation: toValidation(wire.validation) };
+  },
+
   async saveMock(id: string, body: string, options: { request?: string } = {}): Promise<MockContent> {
     const known = lastRead.get(id);
 
@@ -381,6 +412,21 @@ export const httpTransport: Transport = {
 
   async reloadStore(): Promise<void> {
     await request<unknown>('/reload', { method: 'POST' });
+  },
+
+  async deleteMock(id: string): Promise<void> {
+    const known = lastRead.get(id);
+
+    await request<void>(`/mocks/${encodePath(id)}`, {
+      method: 'DELETE',
+      // Required by the server on a mock that exists: without it the delete is refused rather than
+      // racing a concurrent edit. See `lastRead` for why it is not re-read here.
+      headers: known?.etag ? { 'If-Match': known.etag } : {},
+    });
+
+    // Nothing left to be stale against, and a retained ETag would be offered for whatever file is
+    // written to this id next.
+    lastRead.delete(id);
   },
 
   async draftFromRequest(requestId: string): Promise<MockDraft> {

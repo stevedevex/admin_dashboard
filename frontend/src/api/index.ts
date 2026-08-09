@@ -9,6 +9,7 @@ export { client as api } from './client';
 export type { Transport } from './transport';
 
 export type {
+  AiStatus,
   MockContent,
   MockDataSummary,
   MockDraft,
@@ -18,6 +19,7 @@ export type {
   MockSummary,
   Operation,
   OperationSchema,
+  PayloadGeneration,
   RequestDetail,
   RequestEntry,
   RequestPage,

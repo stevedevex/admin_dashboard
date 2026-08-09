@@ -1,16 +1,51 @@
+/* Anchors the floating hint, so showing it never moves what is underneath. */
+.root {
+  position: relative;
+  min-height: 0;
+}
+
+/*
+ * Sized by its contents, not by a share of the column. At rest that is one toolbar; the payload
+ * editor below takes everything this does not need, which is nearly all of it.
+ */
 .wrap {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  background: var(--tao-surface);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-md);
+  overflow: hidden;
 }
 
-.controls {
+.bar {
   display: flex;
   align-items: center;
   gap: var(--tao-space-2);
   padding: var(--tao-space-2) var(--tao-space-3);
-  border-bottom: 1px solid var(--tao-border);
+}
+
+/* Small text actions that must not read as peers of Resolve. */
+.subtle {
+  padding: var(--tao-space-1) var(--tao-space-2);
+  font: inherit;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--tao-radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subtle:hover {
+  color: var(--tao-text);
+  border-color: var(--tao-border-strong);
+}
+
+.subtle:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: 1px;
 }
 
 .method {
@@ -36,10 +71,13 @@
   color: var(--tao-text);
 }
 
+/* Present only when an envelope or a body is being described. Tall enough to read an envelope,
+   short enough that it never becomes the reason the payload editor is cramped. */
 .editor {
-  flex: 1;
+  height: 180px;
   min-height: 0;
   overflow: auto;
+  border-top: 1px solid var(--tao-border);
 }
 
 .error {
@@ -104,4 +142,27 @@
   font-family: var(--tao-font-mono);
   font-size: var(--tao-text-xs);
   color: var(--tao-text-muted);
+}
+
+/* Sits where the trace will, so the panel is the same height before and after a run. */
+/*
+ * Over the payload, not above it. Informational only, so it never takes the pointer — a hint that
+ * swallowed the click meant for the editor beneath would be worse than no hint.
+ */
+.hint {
+  position: absolute;
+  top: calc(100% + var(--tao-space-1));
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: var(--tao-space-3);
+  pointer-events: none;
+  font-size: var(--tao-text-xs);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+  background: var(--tao-surface);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-md);
+  box-shadow: var(--tao-shadow-md);
 }

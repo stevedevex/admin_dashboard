@@ -1,6 +1,5 @@
 .tree,
-.operations,
-.files {
+.operations {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -40,40 +39,16 @@
   color: var(--tao-text-muted);
 }
 
-/* Indented under its service, and lighter than one: this is a grouping, not a heading. */
+/*
+ * The selectable leaf. It carries the weight a file row used to: this is what a reader picks, and
+ * what the panel opposite describes.
+ */
 .operation {
   display: flex;
   align-items: center;
   gap: var(--tao-space-2);
   width: 100%;
-  padding: var(--tao-space-1) var(--tao-space-3) var(--tao-space-1) var(--tao-space-5);
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: var(--tao-text-xs);
-  color: var(--tao-text-muted);
-  text-align: left;
-  cursor: pointer;
-}
-
-.operation:hover {
-  background: var(--tao-surface-sunken);
-}
-
-.operationName {
-  flex: 1;
-  font-family: var(--tao-font-mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file {
-  display: flex;
-  align-items: center;
-  gap: var(--tao-space-2);
-  width: 100%;
-  padding: var(--tao-space-2) var(--tao-space-3) var(--tao-space-2) var(--tao-space-4);
+  padding: var(--tao-space-2) var(--tao-space-3) var(--tao-space-2) 0;
   border: none;
   background: transparent;
   font-family: inherit;
@@ -83,31 +58,22 @@
   cursor: pointer;
 }
 
-.file:hover {
+.operation:hover {
   background: var(--tao-surface-sunken);
 }
 
-.fileActive {
-  composes: file;
+.operation:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: -2px;
+}
+
+.operationActive {
+  composes: operation;
   background: var(--tao-surface-sunken);
   font-weight: 500;
 }
 
-/* Active indicator, matching the rail. */
-.marker {
-  width: 3px;
-  align-self: stretch;
-  min-height: 18px;
-  margin-right: var(--tao-space-3);
-  background: transparent;
-  border-radius: 0 2px 2px 0;
-}
-
-.fileActive .marker {
-  background: var(--tao-accent);
-}
-
-.fileName {
+.operationName {
   flex: 1;
   min-width: 0;
   font-family: var(--tao-font-mono);
@@ -117,29 +83,22 @@
   white-space: nowrap;
 }
 
-/* Inherited files read as present but not owned: same name, less weight. */
-.fileNameInherited {
-  composes: fileName;
+/* Wholly inherited operations read as present but not owned: same name, less weight. */
+.operationNameInherited {
+  composes: operationName;
   color: var(--tao-text-muted);
 }
 
-/* Fixed-width slot so file names align whether or not the glyph is there. */
-.own,
-.inherited {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  flex: 0 0 14px;
+/* Active indicator, matching the rail and the request log. */
+.marker {
+  width: 3px;
+  align-self: stretch;
+  min-height: 18px;
+  margin-right: var(--tao-space-3);
+  background: transparent;
+  border-radius: 0 2px 2px 0;
 }
 
-.inherited {
-  color: var(--tao-info);
-}
-
-.size {
-  font-size: var(--tao-text-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--tao-text-muted);
-  white-space: nowrap;
+.operationActive .marker {
+  background: var(--tao-accent);
 }
