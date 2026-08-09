@@ -30,6 +30,12 @@ tao.sandbox:
     active: baseline
     header: X-Sandbox-Scenario
 
+  # The request log is in memory, bounded, and dropped on restart — an observation aid, not a
+  # store of record. Defaults shown; raise capacity when capturing a long run.
+  requestLog:
+    capacity: 500
+    maxBodyChars: 32768
+
   services:
     - id: petstore
       name: Pet Store

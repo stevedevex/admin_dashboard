@@ -142,6 +142,33 @@ kind: FAULT          # SOAP: serve this payload inside a fault envelope
 <b:Context xmlns:b="http://example.org/billing">...</b:Context>
 ```
 
+## The request log
+
+Every request the sandbox receives — hit, miss, or rejected — is recorded and browsable at
+`GET /__tao/requests`, with each entry carrying the extracted keys, every path tried, and the
+request/response bodies. The misses are what the log is usually opened for: a miss entry names
+the exact file that would have answered, which turns "my mock is not matching" into "create this
+file".
+
+**It is in memory, bounded, and dropped on restart — deliberately.** The log is an observation
+aid, not a store of record: persisting it would make the sandbox a system with state worth
+backing up, which is the opposite of what it is for. Nothing else depends on it — serving mocks
+re-derives everything from each incoming request, so replay works regardless of what the log
+remembers.
+
+Two properties tune it:
+
+```yaml
+tao.sandbox:
+  requestLog:
+    capacity: 500          # entries retained; oldest are evicted when the buffer wraps
+    maxBodyChars: 32768    # bodies longer than this are truncated (and flagged), not dropped
+```
+
+When the buffer has wrapped past a reader's cursor, the log says so (`"mode": "SAMPLED"`) rather
+than silently presenting a thinned history as the whole one. Capturing a long load-test run
+means raising `capacity` for that instance, not trusting the defaults.
+
 ## Testing what you added
 
 - `GET /__tao/services` — is the operation served, with the keys you meant?
