@@ -11,6 +11,8 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import com.tao.sandbox.xml.Xml;
 import com.tao.sandbox.spec.SpecRegistry;
+import com.tao.sandbox.store.MockDocument;
+import com.tao.sandbox.store.MockMeta;
 import com.tao.sandbox.spec.wsdl.SoapSchemas;
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -70,13 +72,70 @@ public class MockValidator {
      *     contract to check against and reporting "valid" would be an invention
      */
     public Validation validate(String serviceId, String operationId, String body) {
+        return validate(serviceId, operationId, body, MockMeta.none());
+    }
+
+    /**
+     * Check a stored payload, taking into account what the mock says it is.
+     *
+     * <p>The schema a contract declares is the schema of its *success* response. A mock that
+     * declares itself a fault, or an error status, is deliberately not that shape — a SOAP fault
+     * detail and a {@code problem+json} body are the two obvious cases, and both are the entire
+     * point of the scenario they live in. Checking them against the success schema marks correct
+     * files invalid, and a checker that reports correct files as broken is one people learn to
+     * ignore within a day.
+     *
+     * <p>They are parsed and reported as {@code SYNTAX} rather than passed: the contract genuinely
+     * declares nothing for them, so nothing checked their shape, and saying "valid" would claim an
+     * assurance nobody has. That is the same answer this gives for an operation with no declared
+     * response body, for the same reason.
+     */
+    public Validation validate(String serviceId, String operationId, String body, MockMeta meta) {
         if (registry.findOperation(serviceId, operationId).isEmpty()) {
             throw new IllegalArgumentException("%s/%s is not served".formatted(serviceId, operationId));
+        }
+
+        if (describesAnError(meta)) {
+            return parsesAtAll(serviceId, operationId, body);
         }
 
         return registry.findRest(serviceId, operationId).isPresent()
                 ? validateJson(serviceId, operationId, body)
                 : validateXml(serviceId, operationId, body);
+    }
+
+    /** A fault, or any status outside 2xx. Both mean "not the shape the contract declares". */
+    private boolean describesAnError(MockMeta meta) {
+        if (meta == null) {
+            return false;
+        }
+        if (meta.kind() == MockDocument.Kind.FAULT) {
+            return true;
+        }
+        return meta.status() != null && (meta.status() < 200 || meta.status() > 299);
+    }
+
+    /**
+     * Well-formed or not, and nothing more.
+     *
+     * <p>Runs the ordinary check and keeps only its parse failures: a malformed payload is still
+     * malformed whatever it claims to be, and that is worth reporting. A schema complaint is not,
+     * because the schema was never the right one to ask.
+     */
+    private Validation parsesAtAll(String serviceId, String operationId, String body) {
+        Validation full =
+                registry.findRest(serviceId, operationId).isPresent()
+                        ? validateJson(serviceId, operationId, body)
+                        : validateXml(serviceId, operationId, body);
+
+        // Anything but SCHEMA means it never reached one — it would not parse, or nothing declared
+        // a shape. Both of those answers are still true for an error payload, so they stand.
+        if (full.checked() != Validation.Checked.SCHEMA) {
+            return full;
+        }
+
+        // It parsed, and was then judged against a schema that was never the right one to ask.
+        return Validation.clean(Validation.Checked.SYNTAX, null);
     }
 
     private Validation validateJson(String serviceId, String operationId, String body) {
