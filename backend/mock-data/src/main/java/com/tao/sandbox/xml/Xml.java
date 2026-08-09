@@ -1,4 +1,4 @@
-package com.tao.sandbox.runtime.soap;
+package com.tao.sandbox.xml;
 
 import java.io.StringReader;
 import javax.xml.XMLConstants;

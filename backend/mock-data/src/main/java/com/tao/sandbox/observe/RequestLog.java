@@ -56,7 +56,7 @@ public class RequestLog {
     public record Page(String mode, String cursor, List<Entry> entries) {}
 
     private final int capacity;
-    private final int maxBodyBytes;
+    private final int maxBodyChars;
 
     private final Deque<Entry> entries = new ArrayDeque<>();
     private long nextId = 1;
@@ -65,7 +65,7 @@ public class RequestLog {
 
     public RequestLog(SandboxProperties properties) {
         this.capacity = Math.max(1, properties.requestLog().capacity());
-        this.maxBodyBytes = Math.max(0, properties.requestLog().maxBodyBytes());
+        this.maxBodyChars = Math.max(0, properties.requestLog().maxBodyChars());
     }
 
     /** One resolved request, hit or miss. */
@@ -171,7 +171,7 @@ public class RequestLog {
         if (body == null) {
             return null;
         }
-        return body.length() <= maxBodyBytes ? body : body.substring(0, maxBodyBytes);
+        return body.length() <= maxBodyChars ? body : body.substring(0, maxBodyChars);
     }
 
     private boolean truncated(String original, String retained) {

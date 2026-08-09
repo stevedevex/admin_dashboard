@@ -22,10 +22,6 @@ import com.tao.sandbox.store.MockRepository;
 import com.tao.sandbox.store.MockSummary;
 import com.tao.sandbox.store.Scenario;
 import com.tao.sandbox.validate.MockStates;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -51,8 +47,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(value = "/__tao/mocks", produces = MediaType.APPLICATION_JSON_VALUE)
 class MockCatalogController {
-
-    private static final String DEFAULT_STEM = "_default";
 
     private final MockRepository repository;
     private final SpecRegistry registry;
@@ -111,7 +105,7 @@ class MockCatalogController {
 
         // An ETag over the content, not the timestamp: a mounted share's clock is not this
         // machine's, and a second-resolution mtime cannot tell two edits inside one second apart.
-        return ResponseEntity.ok().eTag(etag(document)).body(detail(mockId, document));
+        return ResponseEntity.ok().eTag(MockEtags.etag(document)).body(detail(mockId, document));
     }
 
     /**
@@ -140,7 +134,7 @@ class MockCatalogController {
         }
 
         Optional<MockDocument> existing = repository.get(mockId);
-        requireFreshness(mockId, existing.orElse(null), ifMatch);
+        MockEtags.requireFreshness(mockId, existing.orElse(null), ifMatch);
 
         MockDocument document =
                 new MockDocument(
@@ -159,7 +153,7 @@ class MockCatalogController {
 
         MockDocument saved = repository.get(mockId).orElseThrow();
         return ResponseEntity.status(existing.isPresent() ? HttpStatus.OK : HttpStatus.CREATED)
-                .eTag(etag(saved))
+                .eTag(MockEtags.etag(saved))
                 .body(detail(mockId, saved));
     }
 
@@ -179,7 +173,7 @@ class MockCatalogController {
                                         ControlPanelProblem.notFound(
                                                 "mock-not-found", "No such mock", mockId.asPath() + " does not exist"));
 
-        requireFreshness(mockId, existing, ifMatch);
+        MockEtags.requireFreshness(mockId, existing, ifMatch);
 
         repository.delete(mockId);
         states.invalidate(mockId);
@@ -248,7 +242,7 @@ class MockCatalogController {
         // more specific matches, which is a mock an author legitimately wants to write.
         String stem =
                 resolved.isEmpty()
-                        ? DEFAULT_STEM
+                        ? MockRepository.DEFAULT_STEM
                         : new MockQuery(null, operation.serviceId(), operation.operationId(), resolved)
                                 .keySignature();
 
@@ -260,56 +254,8 @@ class MockCatalogController {
 
     // --- internals ---------------------------------------------------------
 
-    /**
-     * @param existing null when the mock does not exist yet
-     * @throws ControlPanelProblem 428 when the header is needed and absent, 412 when it is stale
-     */
-    private void requireFreshness(MockId id, MockDocument existing, String ifMatch) {
-        String supplied = ifMatch == null || ifMatch.isBlank() ? null : ifMatch.trim();
 
-        if (existing == null) {
-            if (supplied != null && !supplied.equals("*")) {
-                throw ControlPanelProblem.preconditionFailed(
-                        "stale-mock",
-                        "Mock has changed",
-                        "%s no longer exists — it was deleted after you loaded it.".formatted(id.asPath()));
-            }
-            return;
-        }
 
-        if (supplied == null) {
-            throw ControlPanelProblem.preconditionRequired(
-                    "if-match-required",
-                    "If-Match required",
-                    "%s already exists. Send the ETag you read it with, so a concurrent edit is refused "
-                                    .formatted(id.asPath())
-                            + "rather than silently overwritten.");
-        }
-
-        String current = quoted(etag(existing));
-        boolean matches =
-                supplied.equals("*")
-                        || java.util.Arrays.stream(supplied.split(","))
-                                .map(String::trim)
-                                .map(MockCatalogController::stripWeak)
-                                .anyMatch(candidate -> candidate.equals(current));
-
-        if (!matches) {
-            throw ControlPanelProblem.preconditionFailed(
-                    "stale-mock",
-                    "Mock has changed",
-                    "%s has been modified since you loaded it. Re-read it and reapply your change."
-                            .formatted(id.asPath()));
-        }
-    }
-
-    private static String quoted(String etag) {
-        return etag.startsWith("\"") ? etag : "\"" + etag + "\"";
-    }
-
-    private static String stripWeak(String etag) {
-        return etag.startsWith("W/") ? etag.substring(2) : etag;
-    }
 
     private MockId parse(String captured) {
         String path = captured.startsWith("/") ? captured.substring(1) : captured;
@@ -433,48 +379,6 @@ class MockCatalogController {
                     "No such service",
                     "'%s' is not one of %s"
                             .formatted(serviceId, registry.services().stream().map(ServiceDescriptor::id).toList()));
-        }
-    }
-
-    /**
-     * A content hash, over the payload and everything the sidecars contribute.
-     *
-     * <p>Headers are sorted rather than taken in iteration order: {@link MockMeta} holds them in an
-     * immutable map whose ordering is randomised per JVM, so an unsorted digest would change on
-     * every restart and make every held ETag stale.
-     */
-    private String etag(MockDocument document) {
-        MockMeta meta = document.meta();
-
-        StringBuilder material =
-                new StringBuilder()
-                        .append(document.body())
-                        .append(' ')
-                        .append(document.envelopeHeader())
-                        .append(' ')
-                        .append(meta.status())
-                        .append(' ')
-                        .append(meta.contentType())
-                        .append(' ')
-                        .append(meta.kind());
-
-        meta.headers().entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(
-                        header ->
-                                material
-                                        .append(' ')
-                                        .append(header.getKey())
-                                        .append('=')
-                                        .append(header.getValue()));
-
-        try {
-            byte[] digest =
-                    MessageDigest.getInstance("SHA-256")
-                            .digest(material.toString().getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is required of every JVM", e);
         }
     }
 }

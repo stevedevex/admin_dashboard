@@ -6,6 +6,13 @@ import java.util.Optional;
 /** Control plane. Used by the admin API, never by request handling. */
 public interface MockRepository extends MockProvider {
 
+    /**
+     * Filename stem of an operation's fallback mock — the one resolution tries when no
+     * key-specific file matches. One constant, because the store resolves it and the control
+     * panel computes names with it, and the two must never disagree.
+     */
+    String DEFAULT_STEM = "_default";
+
     /** Metadata only — bodies are never loaded for browsing. */
     List<MockSummary> list(String scenarioId, String serviceId);
 

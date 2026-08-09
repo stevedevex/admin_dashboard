@@ -6,6 +6,7 @@ import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockDocument.Kind;
 import com.tao.sandbox.spec.wsdl.SoapOperationDefinition;
 import com.tao.sandbox.spec.wsdl.SoapServiceDefinition;
+import com.tao.sandbox.xml.Xml;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.namespace.QName;
 import org.slf4j.Logger;

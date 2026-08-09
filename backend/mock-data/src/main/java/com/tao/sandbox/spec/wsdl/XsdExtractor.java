@@ -1,14 +1,19 @@
 package com.tao.sandbox.spec.wsdl;
 
-import com.tao.sandbox.runtime.soap.Xml;
+import com.tao.sandbox.xml.Dom;
+import com.tao.sandbox.xml.Xml;
+import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.namespace.QName;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
@@ -153,7 +158,7 @@ final class XsdExtractor {
     private static Element merge(List<Element> schemas) {
         Document target;
         try {
-            target = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+            target = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
         } catch (Exception e) {
             // DocumentBuilderFactory with no special configuration does not fail in practice.
             throw new IllegalStateException(e);
@@ -162,7 +167,7 @@ final class XsdExtractor {
         Element root = target.createElementNS(XSD_NS, "xsd:schema");
         target.appendChild(root);
 
-        java.util.Set<String> declaredPrefixes = new java.util.LinkedHashSet<>();
+        Set<String> declaredPrefixes = new LinkedHashSet<>();
         for (Element schema : schemas) {
             copyNamespaceDeclarations(schema, root, declaredPrefixes);
             for (String attribute : List.of("targetNamespace", "elementFormDefault", "attributeFormDefault")) {
@@ -173,7 +178,7 @@ final class XsdExtractor {
         }
 
         for (Element schema : schemas) {
-            for (Element child : elementChildren(schema)) {
+            for (Element child : Dom.elementChildren(schema)) {
                 String name = child.getLocalName();
                 if (!"import".equals(name) && !"include".equals(name) && !"redefine".equals(name)) {
                     root.appendChild(target.importNode(child, true));
@@ -184,7 +189,7 @@ final class XsdExtractor {
         return root;
     }
 
-    private static void copyNamespaceDeclarations(Element source, Element target, java.util.Set<String> seen) {
+    private static void copyNamespaceDeclarations(Element source, Element target, Set<String> seen) {
         NamedNodeMap attributes = source.getAttributes();
         for (int i = 0; i < attributes.getLength(); i++) {
             if (attributes.item(i) instanceof Attr attribute
@@ -195,16 +200,6 @@ final class XsdExtractor {
         }
     }
 
-    private static List<Element> elementChildren(Node parent) {
-        List<Element> found = new ArrayList<>();
-        NodeList children = parent.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            if (children.item(i) instanceof Element element) {
-                found.add(element);
-            }
-        }
-        return found;
-    }
 
     /**
      * Compiles the inline schema(s) as the roots, resolving every {@code <xsd:import>} and
@@ -251,11 +246,11 @@ final class XsdExtractor {
         Map<String, QName> messageElements = new LinkedHashMap<>();
 
         for (Element definitions : allDefinitions) {
-            for (Element message : children(definitions, WSDL_NS, "message")) {
-                for (Element part : children(message, WSDL_NS, "part")) {
+            for (Element message : Dom.children(definitions, WSDL_NS, "message")) {
+                for (Element part : Dom.children(message, WSDL_NS, "part")) {
                     String element = part.getAttribute("element");
                     if (!element.isBlank()) {
-                        messageElements.put(message.getAttribute("name"), resolve(element, part));
+                        messageElements.put(message.getAttribute("name"), Dom.qnameOf(element, part));
                     }
                 }
             }
@@ -264,10 +259,10 @@ final class XsdExtractor {
         Map<String, QName> byOperation = new LinkedHashMap<>();
 
         for (Element definitions : allDefinitions) {
-            for (Element portType : children(definitions, WSDL_NS, "portType")) {
-                for (Element operation : children(portType, WSDL_NS, "operation")) {
-                    for (Element output : children(operation, WSDL_NS, "output")) {
-                        QName element = messageElements.get(localPart(output.getAttribute("message")));
+            for (Element portType : Dom.children(definitions, WSDL_NS, "portType")) {
+                for (Element operation : Dom.children(portType, WSDL_NS, "operation")) {
+                    for (Element output : Dom.children(operation, WSDL_NS, "output")) {
+                        QName element = messageElements.get(Dom.localPart(output.getAttribute("message")));
                         if (element != null) {
                             byOperation.put(operation.getAttribute("name"), element);
                         }
@@ -302,12 +297,12 @@ final class XsdExtractor {
         public void setCharacterStream(Reader characterStream) {}
 
         @Override
-        public java.io.InputStream getByteStream() {
+        public InputStream getByteStream() {
             return null;
         }
 
         @Override
-        public void setByteStream(java.io.InputStream byteStream) {}
+        public void setByteStream(InputStream byteStream) {}
 
         @Override
         public String getStringData() {
@@ -360,8 +355,8 @@ final class XsdExtractor {
 
     private static List<Element> inlineSchemas(Element definitions) {
         List<Element> schemas = new ArrayList<>();
-        for (Element types : children(definitions, WSDL_NS, "types")) {
-            schemas.addAll(children(types, XSD_NS, "schema"));
+        for (Element types : Dom.children(definitions, WSDL_NS, "types")) {
+            schemas.addAll(Dom.children(types, XSD_NS, "schema"));
         }
         return schemas;
     }
@@ -409,30 +404,6 @@ final class XsdExtractor {
         }
     }
 
-    private static QName resolve(String prefixed, Element scope) {
-        int colon = prefixed.indexOf(':');
-        if (colon < 0) {
-            return new QName(prefixed);
-        }
-        String namespace = scope.lookupNamespaceURI(prefixed.substring(0, colon));
-        return new QName(namespace == null ? "" : namespace, prefixed.substring(colon + 1));
-    }
 
-    private static String localPart(String prefixed) {
-        int colon = prefixed.indexOf(':');
-        return colon < 0 ? prefixed : prefixed.substring(colon + 1);
-    }
 
-    private static List<Element> children(Node parent, String namespace, String localName) {
-        List<Element> found = new ArrayList<>();
-        NodeList nodes = parent.getChildNodes();
-        for (int i = 0; i < nodes.getLength(); i++) {
-            if (nodes.item(i) instanceof Element element
-                    && localName.equals(element.getLocalName())
-                    && namespace.equals(element.getNamespaceURI())) {
-                found.add(element);
-            }
-        }
-        return found;
-    }
 }

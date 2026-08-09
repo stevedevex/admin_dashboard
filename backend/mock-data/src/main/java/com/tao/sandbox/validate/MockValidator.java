@@ -9,7 +9,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import com.tao.sandbox.runtime.soap.Xml;
+import com.tao.sandbox.xml.Xml;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.spec.wsdl.SoapSchemas;
 import java.io.StringReader;

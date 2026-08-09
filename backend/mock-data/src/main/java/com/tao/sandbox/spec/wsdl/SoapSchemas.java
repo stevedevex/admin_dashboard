@@ -1,5 +1,7 @@
 package com.tao.sandbox.spec.wsdl;
 
+import com.tao.sandbox.xml.Dom;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -122,7 +124,7 @@ public record SoapSchemas(
 
     /** Element declarations inside a complexType's sequence, all or choice, at any nesting. */
     private List<Element> particles(Element type) {
-        List<Element> found = new java.util.ArrayList<>();
+        List<Element> found = new ArrayList<>();
         collectParticles(type, found);
         return found;
     }
@@ -145,7 +147,7 @@ public record SoapSchemas(
 
     /** An element declaration's type: inline, or the global complexType its {@code type} names. */
     private Element typeOf(Element declaration, String namespace) {
-        for (Element child : elementChildren(declaration)) {
+        for (Element child : Dom.elementChildren(declaration)) {
             if (XSD_NS.equals(child.getNamespaceURI()) && "complexType".equals(child.getLocalName())) {
                 return child;
             }
@@ -171,7 +173,7 @@ public record SoapSchemas(
                 continue;
             }
 
-            for (Element child : elementChildren(schema)) {
+            for (Element child : Dom.elementChildren(schema)) {
                 if (XSD_NS.equals(child.getNamespaceURI())
                         && kind.equals(child.getLocalName())
                         && name.equals(child.getAttribute("name"))) {
@@ -183,7 +185,7 @@ public record SoapSchemas(
     }
 
     private Element firstChild(Element parent, String localName) {
-        for (Element child : elementChildren(parent)) {
+        for (Element child : Dom.elementChildren(parent)) {
             if (localName.equals(child.getLocalName())) {
                 return child;
             }
@@ -191,16 +193,6 @@ public record SoapSchemas(
         return null;
     }
 
-    private List<Element> elementChildren(Node parent) {
-        List<Element> found = new java.util.ArrayList<>();
-        NodeList children = parent.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            if (children.item(i) instanceof Element element) {
-                found.add(element);
-            }
-        }
-        return found;
-    }
 
     private static final class Tally {
         private int declared;

@@ -11,12 +11,14 @@ import com.tao.sandbox.runtime.resolve.ResolutionTrace;
 import com.tao.sandbox.runtime.soap.SoapEnvelope;
 import com.tao.sandbox.runtime.soap.SoapRequestFacade;
 import com.tao.sandbox.runtime.soap.SoapVersion;
-import com.tao.sandbox.runtime.soap.Xml;
+import com.tao.sandbox.xml.Xml;
 import com.tao.sandbox.spec.OperationDefinition;
 import com.tao.sandbox.spec.ServedOperation;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.spec.wsdl.SoapServiceDefinition;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -237,8 +239,8 @@ class ResolveController {
             int equals = pair.indexOf('=');
             if (equals > 0) {
                 parameters.put(
-                        java.net.URLDecoder.decode(pair.substring(0, equals), java.nio.charset.StandardCharsets.UTF_8),
-                        java.net.URLDecoder.decode(pair.substring(equals + 1), java.nio.charset.StandardCharsets.UTF_8));
+                        URLDecoder.decode(pair.substring(0, equals), StandardCharsets.UTF_8),
+                        URLDecoder.decode(pair.substring(equals + 1), StandardCharsets.UTF_8));
             }
         }
         return parameters;

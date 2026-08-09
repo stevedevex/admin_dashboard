@@ -1,6 +1,8 @@
 package com.tao.sandbox.store;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.SequencedMap;
 
@@ -22,7 +24,7 @@ public record MockQuery(
 
     @Override
     public SequencedMap<String, String> keys() {
-        return java.util.Collections.unmodifiableSequencedMap(keys);
+        return Collections.unmodifiableSequencedMap(keys);
     }
 
     /**
@@ -42,6 +44,6 @@ public record MockQuery(
             }
             joined.append(entry.getKey()).append('=').append(entry.getValue());
         }
-        return joined.toString().toLowerCase(java.util.Locale.ROOT);
+        return joined.toString().toLowerCase(Locale.ROOT);
     }
 }

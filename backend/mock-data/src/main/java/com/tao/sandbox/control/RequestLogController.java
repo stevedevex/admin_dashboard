@@ -1,6 +1,7 @@
 package com.tao.sandbox.control;
 
 import com.tao.sandbox.observe.RequestLog;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -74,7 +75,7 @@ class RequestLogController {
     /** One entry without its bodies. */
     record Summary(
             String id,
-            java.time.Instant at,
+            Instant at,
             String serviceId,
             String operationId,
             String scenarioId,

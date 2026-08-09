@@ -43,11 +43,12 @@ public record SandboxProperties(
      *
      * @param capacity how many entries to retain. Bounded because an unbounded log of a service
      *     under load is a memory leak with a friendly name.
-     * @param maxBodyBytes bodies longer than this are truncated rather than dropped, so a large
-     *     payload still shows what it was without retaining megabytes per entry
+     * @param maxBodyChars bodies longer than this are truncated rather than dropped, so a large
+     *     payload still shows what it was without retaining megabytes per entry. Characters, not
+     *     bytes — truncation is a substring, and naming it in bytes would overstate the cap.
      */
     public record RequestLog(
-            @DefaultValue("500") int capacity, @DefaultValue("32768") int maxBodyBytes) {}
+            @DefaultValue("500") int capacity, @DefaultValue("32768") int maxBodyChars) {}
 
     public enum ServiceType {
         REST,

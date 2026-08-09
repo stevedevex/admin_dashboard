@@ -1,11 +1,14 @@
 package com.tao.sandbox.runtime.soap;
 
 import com.tao.sandbox.runtime.match.RequestFacade;
+import com.tao.sandbox.xml.Dom;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
@@ -95,25 +98,15 @@ public class SoapRequestFacade implements RequestFacade {
             return;
         }
 
-        for (Element child : elementsOf(sections.item(0))) {
+        for (Element child : Dom.elementChildren(sections.item(0))) {
             if (descend) {
-                elementsOf(child).forEach(field -> names.add(field.getLocalName()));
+                Dom.elementChildren(child).forEach(field -> names.add(field.getLocalName()));
             } else {
                 names.add(child.getLocalName());
             }
         }
     }
 
-    private List<Element> elementsOf(Node parent) {
-        List<Element> elements = new ArrayList<>();
-        NodeList children = parent.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            if (children.item(i) instanceof Element element) {
-                elements.add(element);
-            }
-        }
-        return elements;
-    }
 
     /**
      * XPath 1.0 cannot address elements in a default namespace at all — an unprefixed name means
@@ -121,7 +114,7 @@ public class SoapRequestFacade implements RequestFacade {
      * prefixes in configuration, and {@code soapenv} is bound here so nobody has to declare it.
      */
     private NamespaceContext context(Map<String, String> configured, SoapVersion version) {
-        Map<String, String> bindings = new java.util.LinkedHashMap<>(configured);
+        Map<String, String> bindings = new LinkedHashMap<>(configured);
         // Bound to whichever version arrived, so a single configured XPath such as
         // /soapenv:Envelope/soapenv:Body/... serves 1.1 and 1.2 clients alike.
         bindings.put("soapenv", version.envelopeNamespace());
@@ -129,7 +122,7 @@ public class SoapRequestFacade implements RequestFacade {
         return new NamespaceContext() {
             @Override
             public String getNamespaceURI(String prefix) {
-                return bindings.getOrDefault(prefix, javax.xml.XMLConstants.NULL_NS_URI);
+                return bindings.getOrDefault(prefix, XMLConstants.NULL_NS_URI);
             }
 
             @Override

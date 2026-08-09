@@ -14,6 +14,7 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,7 +52,7 @@ public class OpenApiSpecLoader {
 
         Map<String, Located> byOperationId = indexByOperationId(document);
         List<OperationDefinition> definitions = new ArrayList<>();
-        Map<String, String> schemas = new java.util.LinkedHashMap<>();
+        Map<String, String> schemas = new LinkedHashMap<>();
 
         for (OperationConfig configured : service.operations()) {
             String operationId = configured.operationId();
@@ -146,7 +147,7 @@ public class OpenApiSpecLoader {
     }
 
     private Map<String, Located> indexByOperationId(OpenAPI document) {
-        Map<String, Located> index = new java.util.LinkedHashMap<>();
+        Map<String, Located> index = new LinkedHashMap<>();
 
         document.getPaths()
                 .forEach(
@@ -165,7 +166,7 @@ public class OpenApiSpecLoader {
     }
 
     private Map<HttpMethod, Operation> methodsOf(PathItem item) {
-        Map<HttpMethod, Operation> methods = new java.util.LinkedHashMap<>();
+        Map<HttpMethod, Operation> methods = new LinkedHashMap<>();
         putIfPresent(methods, HttpMethod.GET, item.getGet());
         putIfPresent(methods, HttpMethod.POST, item.getPost());
         putIfPresent(methods, HttpMethod.PUT, item.getPut());

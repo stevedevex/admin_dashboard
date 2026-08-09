@@ -55,7 +55,6 @@ import org.yaml.snakeyaml.Yaml;
 public class FilesystemMockRepository implements MockRepository {
 
     private static final Logger log = LoggerFactory.getLogger(FilesystemMockRepository.class);
-    private static final String DEFAULT_STEM = "_default";
 
     private final Path root;
 

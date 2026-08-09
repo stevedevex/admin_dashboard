@@ -3,11 +3,16 @@ package com.tao.sandbox.spec.wsdl;
 import com.tao.sandbox.config.SandboxProperties.OperationConfig;
 import com.tao.sandbox.config.SandboxProperties.ServiceConfig;
 import com.tao.sandbox.runtime.match.KeySpec;
-import com.tao.sandbox.runtime.soap.Xml;
+import com.tao.sandbox.xml.Dom;
+import com.tao.sandbox.xml.Xml;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +22,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 /**
@@ -194,12 +198,12 @@ public class WsdlSpecLoader {
         Map<String, QName> messageElements = new LinkedHashMap<>();
 
         for (Element definitions : allDefinitions) {
-            for (Element message : children(definitions, WSDL_NS, "message")) {
+            for (Element message : Dom.children(definitions, WSDL_NS, "message")) {
                 String messageName = message.getAttribute("name");
-                for (Element part : children(message, WSDL_NS, "part")) {
+                for (Element part : Dom.children(message, WSDL_NS, "part")) {
                     String element = part.getAttribute("element");
                     if (!element.isBlank()) {
-                        messageElements.put(messageName, resolveQName(element, part));
+                        messageElements.put(messageName, Dom.qnameOf(element, part));
                     }
                 }
             }
@@ -210,13 +214,13 @@ public class WsdlSpecLoader {
         for (Element definitions : allDefinitions) {
             String targetNamespace = definitions.getAttribute("targetNamespace");
 
-            for (Element portType : children(definitions, WSDL_NS, "portType")) {
-                for (Element operation : children(portType, WSDL_NS, "operation")) {
+            for (Element portType : Dom.children(definitions, WSDL_NS, "portType")) {
+                for (Element operation : Dom.children(portType, WSDL_NS, "operation")) {
                     String operationName = operation.getAttribute("name");
 
                     QName inputElement = null;
-                    for (Element input : children(operation, WSDL_NS, "input")) {
-                        String message = localPart(input.getAttribute("message"));
+                    for (Element input : Dom.children(operation, WSDL_NS, "input")) {
+                        String message = Dom.localPart(input.getAttribute("message"));
                         inputElement = messageElements.get(message);
                     }
 
@@ -233,11 +237,11 @@ public class WsdlSpecLoader {
     private Map<String, String> mapSoapActions(List<Element> allDefinitions) {
         Map<String, String> actions = new LinkedHashMap<>();
         for (Element definitions : allDefinitions) {
-            for (Element binding : children(definitions, WSDL_NS, "binding")) {
-                for (Element operation : children(binding, WSDL_NS, "operation")) {
+            for (Element binding : Dom.children(definitions, WSDL_NS, "binding")) {
+                for (Element operation : Dom.children(binding, WSDL_NS, "operation")) {
                     String name = operation.getAttribute("name");
                     String action = "";
-                    for (Element soapOperation : children(operation, SOAP_NS, "operation")) {
+                    for (Element soapOperation : Dom.children(operation, SOAP_NS, "operation")) {
                         action = soapOperation.getAttribute("soapAction");
                     }
                     actions.put(name, action);
@@ -272,8 +276,8 @@ public class WsdlSpecLoader {
             ServiceConfig service, Element definitions, List<String> problems) {
 
         Map<String, String> loaded = new LinkedHashMap<>();
-        java.util.Deque<String> queue = new java.util.ArrayDeque<>(referencesIn(definitions));
-        java.util.Set<String> queued = new java.util.HashSet<>(queue);
+        Deque<String> queue = new ArrayDeque<>(referencesIn(definitions));
+        Set<String> queued = new HashSet<>(queue);
 
         while (!queue.isEmpty()) {
             String reference = queue.poll();
@@ -360,9 +364,9 @@ public class WsdlSpecLoader {
 
     private String findAddress(List<Element> allDefinitions) {
         for (Element definitions : allDefinitions) {
-            for (Element service : children(definitions, WSDL_NS, "service")) {
-                for (Element port : children(service, WSDL_NS, "port")) {
-                    for (Element address : children(port, SOAP_NS, "address")) {
+            for (Element service : Dom.children(definitions, WSDL_NS, "service")) {
+                for (Element port : Dom.children(service, WSDL_NS, "port")) {
+                    for (Element address : Dom.children(port, SOAP_NS, "address")) {
                         return address.getAttribute("location");
                     }
                 }
@@ -371,33 +375,4 @@ public class WsdlSpecLoader {
         return null;
     }
 
-    private QName resolveQName(String prefixed, Element scope) {
-        int colon = prefixed.indexOf(':');
-        if (colon < 0) {
-            return new QName(prefixed);
-        }
-        String prefix = prefixed.substring(0, colon);
-        String local = prefixed.substring(colon + 1);
-        String namespace = scope.lookupNamespaceURI(prefix);
-        return new QName(namespace == null ? "" : namespace, local);
-    }
-
-    private String localPart(String prefixed) {
-        int colon = prefixed.indexOf(':');
-        return colon < 0 ? prefixed : prefixed.substring(colon + 1);
-    }
-
-    private List<Element> children(Node parent, String namespace, String localName) {
-        List<Element> found = new ArrayList<>();
-        NodeList nodes = parent.getChildNodes();
-        for (int i = 0; i < nodes.getLength(); i++) {
-            Node node = nodes.item(i);
-            if (node instanceof Element element
-                    && localName.equals(element.getLocalName())
-                    && namespace.equals(element.getNamespaceURI())) {
-                found.add(element);
-            }
-        }
-        return found;
-    }
 }

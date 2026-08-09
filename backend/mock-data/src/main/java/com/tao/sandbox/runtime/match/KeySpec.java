@@ -1,5 +1,6 @@
 package com.tao.sandbox.runtime.match;
 
+import java.util.Arrays;
 import java.util.Locale;
 
 /**
@@ -40,7 +41,7 @@ public record KeySpec(String name, Source source, String expression) {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
                     "Unknown key source '%s'. Expected one of %s"
-                            .formatted(rawSource, java.util.Arrays.toString(Source.values())));
+                            .formatted(rawSource, Arrays.toString(Source.values())));
         }
 
         return new KeySpec(deriveName(source, expression), source, expression);
