@@ -600,6 +600,115 @@ class ControlPanelWriteTest {
                 .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
+    // --- record and replay -------------------------------------------------
+
+    /**
+     * The point of the whole flow: a call nothing answered names the file that would have answered
+     * it, with the keys already normalised and a payload shaped like the contract's response.
+     */
+    @Test
+    void aMissedCallDraftsTheMockItWasAskingFor() {
+        // 10/0 exists in the library, so 10/5 misses.
+        mvc.post()
+                .uri("/soap/calculator")
+                .contentType(MediaType.TEXT_XML)
+                .content(
+                        """
+                        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body>\
+                        <calc:Divide xmlns:calc="http://tempuri.org/"><calc:intA>10</calc:intA>\
+                        <calc:intB>5</calc:intB></calc:Divide></soapenv:Body></soapenv:Envelope>""")
+                .exchange();
+
+        MvcTestResult page = mvc.get().uri("/__tao/requests").exchange();
+        MvcTestResult draft = mvc.get().uri("/__tao/requests/" + cursorOf(page) + "/draft").exchange();
+
+        assertThat(draft).hasStatusOk();
+        assertThat(draft)
+                .bodyJson()
+                .extractingPath("$.mockId")
+                .isEqualTo("baseline/calculator/Divide/inta=10&intb=5.xml");
+        assertThat(draft).bodyJson().extractingPath("$.keys.intA").isEqualTo("10");
+        assertThat(draft).bodyJson().extractingPath("$.exists").isEqualTo(false);
+        // Shaped like the declared response, and empty — a starting point, never a mock.
+        assertThat(draft).bodyJson().extractingPath("$.skeleton").asString().contains("DivideResult");
+        // The call that motivated it travels too, to be stored beside the mock as provenance.
+        assertThat(draft).bodyJson().extractingPath("$.requestBody").asString().contains("intB");
+    }
+
+    /** Saving the draft is the ordinary write, so the mock it named now answers that call. */
+    @Test
+    void theDraftedMockAnswersTheCallThatAskedForIt() {
+        String id = "baseline/petstore/showPetById/petid=404.json";
+
+        mvc.get().uri("/petstore/v1/pets/404").exchange();
+        MvcTestResult page = mvc.get().uri("/__tao/requests").exchange();
+        MvcTestResult draft = mvc.get().uri("/__tao/requests/" + cursorOf(page) + "/draft").exchange();
+
+        assertThat(draft).bodyJson().extractingPath("$.mockId").isEqualTo(id);
+        assertThat(draft).bodyJson().extractingPath("$.skeleton").asString().contains("\"name\"");
+
+        mvc.put()
+                .uri("/__tao/mocks/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        { "body": "{ \\"id\\": 404, \\"name\\": \\"Drafted\\" }" }""")
+                .exchange();
+
+        assertThat(mvc.get().uri("/petstore/v1/pets/404").exchange())
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.name")
+                .isEqualTo("Drafted");
+    }
+
+    /**
+     * A file named from a subset of an ALL operation's keys can never be reached. The call was
+     * answered by the operation's default, so that is what the draft proposes — and it says why.
+     */
+    @Test
+    void aCallCarryingOnlySomeKeysDraftsTheDefaultAndExplains() {
+        mvc.post()
+                .uri("/soap/calculator")
+                .contentType(MediaType.TEXT_XML)
+                .content(
+                        """
+                        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body>\
+                        <calc:Add xmlns:calc="http://tempuri.org/"><calc:intA>1</calc:intA>\
+                        </calc:Add></soapenv:Body></soapenv:Envelope>""")
+                .exchange();
+
+        MvcTestResult page = mvc.get().uri("/__tao/requests").exchange();
+        MvcTestResult draft = mvc.get().uri("/__tao/requests/" + cursorOf(page) + "/draft").exchange();
+
+        assertThat(draft).hasStatusOk();
+        assertThat(draft)
+                .bodyJson()
+                .extractingPath("$.mockId")
+                .isEqualTo("baseline/calculator/Add/_default.xml");
+        assertThat(draft).bodyJson().extractingPath("$.keys").asMap().isEmpty();
+        assertThat(draft).bodyJson().extractingPath("$.note").asString().contains("intA");
+    }
+
+    /** A request rejected before resolution has no contract to write a mock against. */
+    @Test
+    void aCallRejectedBeforeResolutionCannotBeDrafted() {
+        mvc.post()
+                .uri("/soap/calculator")
+                .contentType(MediaType.TEXT_XML)
+                .content(
+                        """
+                        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body>\
+                        <calc:Multiply xmlns:calc="http://tempuri.org/"><calc:intA>2</calc:intA>\
+                        </calc:Multiply></soapenv:Body></soapenv:Envelope>""")
+                .exchange();
+
+        MvcTestResult page = mvc.get().uri("/__tao/requests").exchange();
+        MvcTestResult draft = mvc.get().uri("/__tao/requests/" + cursorOf(page) + "/draft").exchange();
+
+        assertThat(draft).hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(draft).bodyJson().extractingPath("$.type").isEqualTo("urn:tao:sandbox:not-resolvable");
+    }
+
     // --- request log -------------------------------------------------------
 
     @Test

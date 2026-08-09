@@ -94,6 +94,82 @@ public record SoapSchemas(
         return tally.declared == 0 ? null : Math.round(100f * tally.present / tally.declared);
     }
 
+    /**
+     * An empty payload shaped like the operation's declared response — every element the schema
+     * names, nested as it declares them, with nothing filled in.
+     *
+     * <p>Offered as a starting point, never as a mock: a skeleton served as-is would answer a
+     * well-formed envelope with no data in it, which is the upstream behaviour this sandbox exists
+     * to eliminate. It saves the typing, not the thinking.
+     *
+     * @return empty when nothing is declared to build from — an RPC-style binding, or an
+     *     operation whose response element the schema does not define
+     */
+    public Optional<String> skeleton(String operationId) {
+        QName element = responseElements.get(operationId);
+        if (element == null) {
+            return Optional.empty();
+        }
+
+        Element declaration = globalElement(element);
+        if (declaration == null) {
+            return Optional.empty();
+        }
+
+        // elementFormDefault decides whether children carry the target namespace or none. Read
+        // rather than assumed: a skeleton in the wrong namespace validates as cleanly as a wrong
+        // payload, which is to say not at all, and the author would be debugging our guess.
+        boolean qualified = "qualified".equals(elementFormDefaultOf(element.getNamespaceURI()));
+
+        StringBuilder out = new StringBuilder();
+        out.append('<').append(element.getLocalPart());
+        out.append(" xmlns=\"").append(element.getNamespaceURI()).append('"');
+        out.append(">\n");
+
+        write(typeOf(declaration, element.getNamespaceURI()), element.getNamespaceURI(), out, 1, qualified);
+
+        out.append("</").append(element.getLocalPart()).append('>');
+        return Optional.of(out.toString());
+    }
+
+    private void write(Element type, String namespace, StringBuilder out, int depth, boolean qualified) {
+        // The same bound completeness uses: a self-referencing type would otherwise never finish.
+        if (type == null || depth > 10) {
+            return;
+        }
+
+        for (Element particle : particles(type)) {
+            String name = particle.getAttribute("name");
+            if (name.isBlank()) {
+                continue;
+            }
+
+            String indent = "  ".repeat(depth);
+            Element childType = typeOf(particle, namespace);
+            // A child in an unqualified schema carries no namespace, and would otherwise inherit
+            // the default declared on the root.
+            String reset = !qualified && depth == 1 ? " xmlns=\"\"" : "";
+
+            if (childType == null) {
+                out.append(indent).append('<').append(name).append(reset).append("></").append(name).append(">\n");
+            } else {
+                out.append(indent).append('<').append(name).append(reset).append(">\n");
+                write(childType, namespace, out, depth + 1, qualified);
+                out.append(indent).append("</").append(name).append(">\n");
+            }
+        }
+    }
+
+    private String elementFormDefaultOf(String namespace) {
+        for (Document document : documents) {
+            Element schema = document.getDocumentElement();
+            if (schema != null && namespace.equals(schema.getAttribute("targetNamespace"))) {
+                return schema.getAttribute("elementFormDefault");
+            }
+        }
+        return "";
+    }
+
     // --- walking the schema ------------------------------------------------
 
     private void count(Element type, String namespace, Element instance, Tally tally, int depth) {
