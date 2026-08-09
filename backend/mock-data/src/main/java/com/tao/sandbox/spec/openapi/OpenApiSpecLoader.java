@@ -38,8 +38,13 @@ public class OpenApiSpecLoader {
      *     declare one. Kept apart from {@link OperationDefinition} because it is control-panel
      *     material — potentially many kilobytes per operation — and request handling never reads
      *     it.
+     * @param serverUrls the {@code servers} the document declares, so serving the contract can
+     *     point them at the sandbox instead of at whatever host the author published
      */
-    public record Loaded(List<OperationDefinition> operations, Map<String, String> responseSchemas) {}
+    public record Loaded(
+            List<OperationDefinition> operations,
+            Map<String, String> responseSchemas,
+            List<String> serverUrls) {}
 
     /**
      * @param problems appended to rather than thrown, so startup can report every fault at once
@@ -47,8 +52,18 @@ public class OpenApiSpecLoader {
     public Loaded load(ServiceConfig service, List<String> problems) {
         OpenAPI document = parse(service, problems);
         if (document == null || document.getPaths() == null) {
-            return new Loaded(List.of(), Map.of());
+            return new Loaded(List.of(), Map.of(), List.of());
         }
+
+        // "/" is the parser's synthetic stand-in for "the document declares no servers", not an
+        // author's address — reporting it would make "none declared" indistinguishable from one.
+        List<String> serverUrls =
+                document.getServers() == null
+                        ? List.of()
+                        : document.getServers().stream()
+                                .map(io.swagger.v3.oas.models.servers.Server::getUrl)
+                                .filter(url -> url != null && !url.isBlank() && !url.equals("/"))
+                                .toList();
 
         Map<String, Located> byOperationId = indexByOperationId(document);
         List<OperationDefinition> definitions = new ArrayList<>();
@@ -93,7 +108,7 @@ public class OpenApiSpecLoader {
                             configured.strategy()));
         }
 
-        return new Loaded(definitions, schemas);
+        return new Loaded(definitions, schemas, serverUrls);
     }
 
     private OpenAPI parse(ServiceConfig service, List<String> problems) {

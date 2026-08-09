@@ -38,6 +38,25 @@ class ControlPanelApiTest {
         assertThat(result).bodyJson().extractingPath("$.root").asString().endsWith("mocks");
     }
 
+    /** The client team fetches what they integrate against from the same host they call. */
+    @Test
+    void theDroppedInContractIsServedVerbatim() throws Exception {
+        MvcTestResult rest = mvc.get().uri("/__tao/services/petstore/spec").exchange();
+        assertThat(rest).hasStatusOk();
+        assertThat(rest.getResponse().getContentType()).isEqualTo("application/yaml");
+        assertThat(rest.getResponse().getContentAsString()).contains("openapi:").contains("listPets");
+        // The served contract points at the sandbox mount — the ?wsdl rule, applied to REST. A
+        // client resolving its endpoint from this document must land here, not on production.
+        assertThat(rest.getResponse().getContentAsString()).contains("url: \"/petstore/v1\"");
+
+        MvcTestResult soap = mvc.get().uri("/__tao/services/stockquote/spec").exchange();
+        assertThat(soap).hasStatusOk();
+        assertThat(soap.getResponse().getContentType()).startsWith("text/xml");
+        assertThat(soap.getResponse().getContentAsString()).contains("definitions").contains("GetLastTradePrice");
+
+        assertThat(mvc.get().uri("/__tao/services/nosuch/spec").exchange()).hasStatus(HttpStatus.NOT_FOUND);
+    }
+
     /**
      * The dashboard renders an input per key and sends the values back to {@code /mocks/name}. It
      * can only do that if the key arrives already named — deriving {@code tickerSymbol} from the

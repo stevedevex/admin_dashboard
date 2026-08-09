@@ -5,6 +5,7 @@ import com.tao.sandbox.spec.ServiceDescriptor;
 import com.tao.sandbox.spec.SpecRegistry;
 import java.util.List;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +30,32 @@ class ServiceCatalogController {
     @GetMapping
     List<ServiceDescriptor> services() {
         return registry.services();
+    }
+
+    /**
+     * The dropped-in contract — OpenAPI document for REST, WSDL for SOAP — so the client team
+     * fetches what they integrate against from the same host they call. Served with the
+     * contract's own media type, not this controller's JSON; a REST document's server address
+     * points at the sandbox mount, per {@link SpecRegistry#contract}.
+     */
+    @GetMapping(value = "/{serviceId}/spec", produces = MediaType.ALL_VALUE)
+    ResponseEntity<String> spec(@PathVariable String serviceId) {
+        SpecRegistry.Contract contract =
+                registry
+                        .contract(serviceId)
+                        .orElseThrow(
+                                () ->
+                                        ControlPanelProblem.notFound(
+                                                "service-not-found",
+                                                "No such service",
+                                                "'%s' is not one of %s"
+                                                        .formatted(
+                                                                serviceId,
+                                                                registry.services().stream()
+                                                                        .map(ServiceDescriptor::id)
+                                                                        .toList())));
+
+        return ResponseEntity.ok().header("Content-Type", contract.mediaType()).body(contract.content());
     }
 
     @GetMapping("/{serviceId}/operations/{operationId}/schema")

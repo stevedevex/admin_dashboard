@@ -7,6 +7,9 @@ import com.tao.sandbox.spec.openapi.OpenApiSpecLoader;
 import com.tao.sandbox.spec.wsdl.SoapServiceDefinition;
 import com.tao.sandbox.spec.wsdl.WsdlSpecLoader;
 import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,10 +36,16 @@ public class SpecRegistry {
     private final OpenApiSpecLoader openApiLoader;
     private final WsdlSpecLoader wsdlLoader;
 
+    private final DefaultResourceLoader resources = new DefaultResourceLoader();
+
     private final Map<String, OperationDefinition> restByKey = new LinkedHashMap<>();
     private final Map<String, SoapServiceDefinition> soapByService = new LinkedHashMap<>();
     private final Map<String, String> responseSchemas = new LinkedHashMap<>();
+    private final Map<String, Contract> contracts = new LinkedHashMap<>();
     private final List<ServiceDescriptor> descriptors = new ArrayList<>();
+
+    /** A dropped-in contract, exactly as its author published it. */
+    public record Contract(String content, String mediaType) {}
 
     public SpecRegistry(
             SandboxProperties properties, OpenApiSpecLoader openApiLoader, WsdlSpecLoader wsdlLoader) {
@@ -55,11 +65,13 @@ public class SpecRegistry {
                 loaded.responseSchemas()
                         .forEach((operationId, schema) -> responseSchemas.put(key(service.id(), operationId), schema));
                 descriptors.add(describeRest(service, loaded.operations()));
+                retainRestContract(service, loaded.serverUrls(), problems);
             } else {
                 SoapServiceDefinition definition = wsdlLoader.load(service, problems);
                 if (definition != null) {
                     soapByService.put(definition.serviceId(), definition);
                     descriptors.add(describeSoap(service, definition));
+                    contracts.put(service.id(), new Contract(definition.wsdl(), "text/xml;charset=UTF-8"));
                 }
             }
         }
@@ -166,6 +178,80 @@ public class SpecRegistry {
      */
     public Optional<String> findResponseSchema(String serviceId, String operationId) {
         return Optional.ofNullable(responseSchemas.get(key(serviceId, operationId)));
+    }
+
+    /**
+     * The contract as it was dropped in — the OpenAPI document for a REST service, the WSDL for a
+     * SOAP one — with one deliberate change: a REST document's server address points at the
+     * sandbox's mount instead of wherever the author published. The same rule the {@code ?wsdl}
+     * endpoint applies, for the same reason: a client that resolves its endpoint from the served
+     * contract must land here, not on production.
+     *
+     * <p>The SOAP content here is the raw WSDL, address and all — the {@code ?wsdl} endpoint on
+     * the service itself serves the rewritten one a client should actually consume.
+     */
+    public Optional<Contract> contract(String serviceId) {
+        return Optional.ofNullable(contracts.get(serviceId));
+    }
+
+    /**
+     * Retained at load, from the same location the parser read: the parser hands back a model,
+     * not the author's bytes, and the served contract should stay the author's document — so the
+     * server address is corrected by targeted text surgery, never by re-serialising the model.
+     */
+    private void retainRestContract(ServiceConfig service, List<String> serverUrls, List<String> problems) {
+        if (service.spec() == null || service.spec().isBlank()) {
+            return; // already reported by the loader
+        }
+
+        try (InputStream in = resources.getResource(service.spec()).getInputStream()) {
+            String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            content = pointServersAtSandbox(content, service, serverUrls);
+            contracts.put(service.id(), new Contract(content, contractMediaType(service.spec(), content)));
+        } catch (IOException e) {
+            problems.add(
+                    "%s: could not read %s for serving — %s".formatted(service.id(), service.spec(), e.getMessage()));
+        }
+    }
+
+    /**
+     * The mount is emitted as a relative URL, so it resolves against whichever host the client
+     * fetched the contract from — no per-request endpoint computation, and it stays correct
+     * behind whatever fronts a deployed instance.
+     *
+     * <p>Three shapes, three treatments: an absolute declared server is string-replaced, exactly
+     * as {@code ?wsdl} replaces {@code soap:address}; a document with no {@code servers} at all
+     * gets a block appended when it is YAML (legal at any top-level position — a JSON document
+     * cannot be appended to without re-serialising, so it is left alone); a relative declared
+     * server is already resolved against this host and is left as the author wrote it.
+     */
+    private static String pointServersAtSandbox(String content, ServiceConfig service, List<String> serverUrls) {
+        String mount = service.basePath() == null || service.basePath().isBlank() ? "/" : service.basePath();
+
+        boolean rewritten = false;
+        for (String url : serverUrls) {
+            if (url.contains("://") && content.contains(url)) {
+                content = content.replace(url, mount);
+                rewritten = true;
+            }
+        }
+
+        boolean isJson = content.stripLeading().startsWith("{");
+        if (!rewritten && serverUrls.isEmpty() && !isJson) {
+            content =
+                    content.stripTrailing()
+                            + "\n\n# Added by the sandbox: requests belong at its mount, not at the author's host.\n"
+                            + "servers:\n- url: \"%s\"\n".formatted(mount);
+        }
+
+        return content;
+    }
+
+    /** OpenAPI documents come as YAML or JSON; say which, so editors highlight correctly. */
+    private static String contractMediaType(String location, String content) {
+        return location.endsWith(".json") || content.stripLeading().startsWith("{")
+                ? "application/json"
+                : "application/yaml";
     }
 
     private static String key(String serviceId, String operationId) {
