@@ -21,6 +21,44 @@ springdoc:
 # served, declare what identifies a request. Everything else is derived.
 # ---------------------------------------------------------------------------
 tao.sandbox:
+  # ---------------------------------------------------------------------------
+  # Payload generation.
+  #
+  # Off unless `endpoint` is set. There is no offline stand-in: a generator producing
+  # schema-shaped placeholder data looks exactly like the feature working, and which one
+  # produced a payload is the one thing a reader cannot check by eye. Unconfigured, the
+  # dashboard disables the action and says why.
+  # ---------------------------------------------------------------------------
+  # ai:
+  #   endpoint: https://<resource>.openai.azure.com   # setting this is what enables the feature
+  #   model: <deployment-name>                        # the deployment, not the base model name
+  #   api-version: 2024-10-21                         # pinned: the response shape is parsed here
+  #   scope: https://cognitiveservices.azure.com/.default
+  #   temperature: 0.4
+  #
+  #   # How the sandbox proves who it is. Every mode ends at a bearer token for `scope`, so
+  #   # nothing downstream knows which was used — the choice is environment, not code.
+  #   auth:
+  #     # DEFAULT — whatever the environment already offers (a developer's `az login`, environment
+  #     #           variables, a managed identity when deployed). Needs no configuration.
+  #     # SPN     — an explicit service principal with a secret. For a local or CI run that must
+  #     #           not depend on an interactive login.
+  #     # UAMI    — a user-assigned managed identity. For a deployment: no secret to hold, leak
+  #     #           or rotate. Leave client-id blank to use the system-assigned identity.
+  #     mode: DEFAULT
+  #
+  #     # SPN only:
+  #     tenant-id: <directory-id>
+  #     client-id: <application-id>
+  #     # NEVER write the secret here. A secret committed to a repository is a secret disclosed,
+  #     # and rotating it is the only remedy. Supply it from the environment instead:
+  #     #     export TAO_SANDBOX_AI_AUTH_CLIENTSECRET=...
+  #     # or from a secret store. Prefer UAMI once deployed, which removes the question entirely.
+  #     client-secret: ""
+  #
+  #     # UAMI only — the identity's client id. Blank selects the system-assigned identity.
+  #     # client-id: <managed-identity-client-id>
+
   store: filesystem
   # The mock library ships with the mock-data module; the app is launched from this module's
   # directory. A deployed instance overrides this with its mounted share.

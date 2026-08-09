@@ -33,6 +33,7 @@
     <swagger-core.version>2.2.34</swagger-core.version>
     <json-schema-validator.version>1.5.9</json-schema-validator.version>
     <spring-ai.version>2.0.0</spring-ai.version>
+    <azure-sdk.version>1.3.8</azure-sdk.version>
   </properties>
 
   <dependencyManagement>
@@ -42,6 +43,16 @@
         <groupId>org.springframework.ai</groupId>
         <artifactId>spring-ai-bom</artifactId>
         <version>${spring-ai.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- The Azure SDK BOM rather than azure-identity alone: identity pulls azure-core and
+           its HTTP stack, and letting the BOM agree those versions is the difference between a
+           working credential and a NoSuchMethodError at first token request. -->
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-sdk-bom</artifactId>
+        <version>${azure-sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

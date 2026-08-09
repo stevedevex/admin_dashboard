@@ -10,11 +10,15 @@ import org.springframework.http.ProblemDetail;
  * <p>The same {@code application/problem+json} shape the data plane already returns on a
  * resolution miss, so the dashboard has one error renderer rather than two.
  *
+ * <p>Public because it is the control plane's shared error vocabulary, not one package's:
+ * every module that mounts endpoints under {@code /__tao} answers failures in this shape, so
+ * the dashboard keeps one error renderer however many modules it is talking to.
+ *
  * <p>{@code detail} is written for whoever is looking at the dashboard, not for a log: it names
  * what was asked for and, where the list is short enough to be useful, what exists instead. A
  * bare "not found" turns a typo into an investigation.
  */
-class ControlPanelProblem extends RuntimeException {
+public class ControlPanelProblem extends RuntimeException {
 
     private final HttpStatus status;
     private final String type;
@@ -27,34 +31,34 @@ class ControlPanelProblem extends RuntimeException {
         this.title = title;
     }
 
-    static ControlPanelProblem notFound(String type, String title, String detail) {
+    public static ControlPanelProblem notFound(String type, String title, String detail) {
         return new ControlPanelProblem(HttpStatus.NOT_FOUND, type, title, detail);
     }
 
     /** The request was understood and is well-formed, but describes something unworkable. */
-    static ControlPanelProblem unprocessable(String type, String title, String detail) {
+    public static ControlPanelProblem unprocessable(String type, String title, String detail) {
         return new ControlPanelProblem(HttpStatus.UNPROCESSABLE_ENTITY, type, title, detail);
     }
 
-    static ControlPanelProblem badRequest(String type, String title, String detail) {
+    public static ControlPanelProblem badRequest(String type, String title, String detail) {
         return new ControlPanelProblem(HttpStatus.BAD_REQUEST, type, title, detail);
     }
 
-    static ControlPanelProblem conflict(String type, String title, String detail) {
+    public static ControlPanelProblem conflict(String type, String title, String detail) {
         return new ControlPanelProblem(HttpStatus.CONFLICT, type, title, detail);
     }
 
     /** The caller holds a version that is no longer current. */
-    static ControlPanelProblem preconditionFailed(String type, String title, String detail) {
+    public static ControlPanelProblem preconditionFailed(String type, String title, String detail) {
         return new ControlPanelProblem(HttpStatus.PRECONDITION_FAILED, type, title, detail);
     }
 
     /** The caller sent no precondition at all, on a request that must not be made blind. */
-    static ControlPanelProblem preconditionRequired(String type, String title, String detail) {
+    public static ControlPanelProblem preconditionRequired(String type, String title, String detail) {
         return new ControlPanelProblem(HttpStatus.PRECONDITION_REQUIRED, type, title, detail);
     }
 
-    ProblemDetail asProblemDetail() {
+    public ProblemDetail asProblemDetail() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, getMessage());
         problem.setType(URI.create("urn:tao:sandbox:" + type));
         problem.setTitle(title);
