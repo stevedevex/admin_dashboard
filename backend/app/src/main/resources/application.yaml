@@ -1,0 +1,105 @@
+spring:
+  application.name: tao-sandbox
+  threads.virtual.enabled: true
+
+server:
+  port: 8080
+
+logging.level:
+  com.tao.sandbox: INFO
+
+# ---------------------------------------------------------------------------
+# The whole adoption surface: drop in a spec, name the operations you want
+# served, declare what identifies a request. Everything else is derived.
+# ---------------------------------------------------------------------------
+tao.sandbox:
+  store: filesystem
+  # The mock library ships with the mock-data module; the app is launched from this module's
+  # directory. A deployed instance overrides this with its mounted share.
+  filesystem.root: ../mock-data/mocks
+
+  scenario:
+    active: baseline
+    header: X-Sandbox-Scenario
+
+  services:
+    - id: petstore
+      name: Pet Store
+      type: REST
+      spec: classpath:specs/petstore/petstore.yaml
+      basePath: /petstore/v1
+      operations:
+        # GET with a path variable
+        - operationId: showPetById
+          keys: [ "path:petId" ]
+
+        # GET with a query parameter; absent means the unfiltered default
+        - operationId: listPets
+          keys: [ "query:limit" ]
+          strategy: FIRST_PRESENT
+
+        # POST with a JSON body
+        - operationId: createPets
+          keys: [ "body:$.name" ]
+
+    - id: stockquote
+      name: Stock Quote
+      type: SOAP
+      wsdl: classpath:specs/stockquote/stockquote.wsdl
+      path: /soap/stockquote
+      # XPath 1.0 cannot address a default namespace, so every prefix used below
+      # is bound here. soapenv is bound automatically.
+      namespaces:
+        sq: "http://example.com/stockquote.xsd"
+      # Applied to every response from this service unless a mock ships its own .header.xml
+      responseHeader: classpath:specs/stockquote/stockquote-response-header.xml
+      operations:
+        # GetTradeHistory is in the WSDL but not listed, so it answers NOT_IMPLEMENTED
+        - operation: GetLastTradePrice
+          keys: [ "xpath:/soapenv:Envelope/soapenv:Body/sq:TradePriceRequest/sq:tickerSymbol" ]
+
+    # --- Added by configuration alone, to prove the service extends without code -------------
+    # A published third-party spec: OpenAPI 3.1, hyphenated operationIds, two path parameters.
+    - id: tictactoe
+      name: Tic Tac Toe
+      type: REST
+      spec: classpath:specs/tictactoe/tictactoe.yaml
+      basePath: /tictactoe
+      operations:
+        - operationId: get-board
+          keys: [ "query:none" ]
+          strategy: FIRST_PRESENT
+        - operationId: get-square
+          keys: [ "path:row", "path:column" ]
+
+    # A machine-generated .NET WSDL fetched from a live public endpoint: two SOAP bindings
+    # (1.1 and 1.2), an inline schema, and its own target namespace.
+    - id: calculator
+      name: Calculator
+      type: SOAP
+      wsdl: classpath:specs/calculator/calculator.wsdl
+      path: /soap/calculator
+      namespaces:
+        calc: "http://tempuri.org/"
+      operations:
+        - operation: Add
+          keys:
+            - "xpath:/soapenv:Envelope/soapenv:Body/calc:Add/calc:intA"
+            - "xpath:/soapenv:Envelope/soapenv:Body/calc:Add/calc:intB"
+        - operation: Divide
+          keys:
+            - "xpath:/soapenv:Envelope/soapenv:Body/calc:Divide/calc:intA"
+            - "xpath:/soapenv:Envelope/soapenv:Body/calc:Divide/calc:intB"
+
+    # A hand-written contract split across two files: the WSDL includes a sibling .xsd rather than
+    # declaring its schema inline. See specs/userservice/.
+    - id: userservice
+      name: User Service
+      type: SOAP
+      wsdl: classpath:specs/userservice/userservice.wsdl
+      path: /soap/userservice
+      namespaces:
+        us: "http://example.org"
+      operations:
+        - operation: GetUser
+          keys: [ "xpath:/soapenv:Envelope/soapenv:Body/us:GetUserRequest/us:UserId" ]

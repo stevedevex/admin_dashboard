@@ -20,6 +20,7 @@
   <description>Developer sandbox: schema-driven mock services, and experiments alongside them</description>
 
   <modules>
+    <module>app</module>
     <module>mock-data</module>
     <module>ai-experimental</module>
   </modules>

@@ -12,7 +12,8 @@
 
   <artifactId>tao-sandbox-mock-data</artifactId>
   <name>tao-sandbox :: mock-data</name>
-  <description>Schema-driven mock service for REST and SOAP contracts</description>
+  <description>Schema-driven mock service for REST and SOAP contracts. A library, not an
+    application: it auto-configures itself into whatever Boot app depends on it.</description>
 
   <dependencies>
     <dependency>
@@ -49,12 +50,4 @@
     </dependency>
   </dependencies>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
 </project>
