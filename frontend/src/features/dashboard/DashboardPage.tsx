@@ -1,102 +1,116 @@
 import { useAtomValue } from 'jotai';
-import { api, type MockDataSummary } from '@/api';
+import { api, type MockDataSummary, type Scenario, type Service } from '@/api';
 import { PageHeader } from '@/app/layout/PageHeader';
 import { useAsync } from '@/hooks/useAsync';
+import { useRequestLog } from '@/hooks/useRequestLog';
 import { storeNonceAtom } from '@/state/store';
 import { formatBytes } from '@/lib/format';
-import { Tag } from '@/ui';
-import { CapabilityCard } from './components/CapabilityCard';
+import { MetricStrip, type Metric } from './components/MetricStrip';
+import { ServingBand } from './components/ServingBand';
+import { ActivityPanel } from './components/ActivityPanel';
+import { CoveragePanel } from './components/CoveragePanel';
+import { RoadmapStrip } from './components/RoadmapStrip';
 import styles from './DashboardPage.module.css';
 
 /**
- * The landing page for the sandbox as a whole.
+ * The landing page: what is being served, what exists, and what is arriving.
  *
- * One card per capability, each summarising itself and linking into its own
- * area. Mock data is the first capability, not the product — later phases add
- * cards here without this page needing to know what they are.
+ * Ordered by how quickly a fact goes stale rather than by how much of it there is. The served
+ * scenario changes what every caller receives and leads; the library counts change when someone
+ * authors a mock; the request feed changes while being watched. Someone opening this page mid-
+ * debug is asking "is my application reaching this, and is it getting what I think" — both halves
+ * of that are answerable here without navigating.
+ *
+ * Each region loads independently. A backend that answers the catalogue but not the log leaves a
+ * page with one broken panel, not a blank screen.
  */
 export function DashboardPage() {
   const storeNonce = useAtomValue(storeNonceAtom);
-  const summary = useAsync<MockDataSummary>(() => api.getMockDataSummary(), [storeNonce]);
 
-  const problems = summary.status === 'ready' ? summary.data.invalidCount + summary.data.incompleteCount : 0;
+  const summary = useAsync<MockDataSummary>(() => api.getMockDataSummary(), [storeNonce]);
+  const services = useAsync<Service[]>(() => api.listServices(), [storeNonce]);
+  const scenarios = useAsync<Scenario[]>(() => api.listScenarios(), [storeNonce]);
+  const log = useRequestLog();
+
+  const facts = summary.status === 'ready' ? summary.data : null;
+  const problems = facts === null ? 0 : facts.invalidCount + facts.incompleteCount;
+
+  const serving =
+    facts !== null && scenarios.status === 'ready'
+      ? (scenarios.data.find((scenario) => scenario.id === facts.activeScenarioId) ?? null)
+      : null;
+
+  const metrics: Metric[] = [
+    {
+      label: 'Services',
+      value: facts === null ? '—' : String(facts.serviceCount),
+      note:
+        facts === null || facts.servicesWithoutSchema === 0
+          ? 'all with schemas'
+          : `${facts.servicesWithoutSchema} without schema`,
+      attention: facts !== null && facts.servicesWithoutSchema > 0,
+      to: '/mock-data/services',
+    },
+    {
+      label: 'Mocks',
+      value: facts === null ? '—' : String(facts.mockCount),
+      note: facts === null ? '' : `largest ${formatBytes(facts.largestMockBytes)}`,
+      to: '/mock-data/mocks',
+    },
+    {
+      label: 'Scenarios',
+      value: facts === null ? '—' : String(facts.scenarioCount),
+      note: serving?.extends ? `extends ${serving.extends}` : 'no inheritance',
+      to: '/mock-data/scenarios',
+    },
+    {
+      label: 'Invalid',
+      value: facts === null ? '—' : String(facts.invalidCount),
+      note: facts === null || facts.invalidCount === 0 ? 'none failing schema' : 'failing schema',
+      attention: facts !== null && facts.invalidCount > 0,
+      to: '/mock-data/mocks',
+    },
+    {
+      label: 'Incomplete',
+      value: facts === null ? '—' : String(facts.incompleteCount),
+      note:
+        facts === null || facts.incompleteCount === 0
+          ? 'none partially filled'
+          : 'partially filled',
+      attention: facts !== null && facts.incompleteCount > 0,
+      to: '/mock-data/mocks',
+    },
+  ];
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        meta={
-          <Tag tone={problems > 0 ? 'warn' : 'ok'}>
-            {problems > 0 ? `${problems} need attention` : 'healthy'}
-          </Tag>
-        }
-      />
+      <PageHeader title="Dashboard" />
 
-      <div className={styles.rows}>
-        <CapabilityCard
-          title="Mock Data"
-          description="Stand in for upstream services with deterministic, versioned responses."
-          icon="mocks"
-          to="/mock-data/mocks"
-          state={summary.status}
-          error={summary.status === 'error' ? summary.error.message : null}
-          stats={
-            summary.status === 'ready'
-              ? [
-                  { label: 'Services', value: String(summary.data.serviceCount) },
-                  { label: 'Mocks', value: String(summary.data.mockCount) },
-                  { label: 'Scenarios', value: String(summary.data.scenarioCount) },
-                  { label: 'Serving', value: summary.data.activeScenarioId, mono: true },
-                ]
-              : []
-          }
-          notes={
-            summary.status === 'ready'
-              ? [
-                  summary.data.invalidCount > 0
-                    ? { tone: 'error' as const, text: `${summary.data.invalidCount} invalid` }
-                    : null,
-                  summary.data.incompleteCount > 0
-                    ? { tone: 'warn' as const, text: `${summary.data.incompleteCount} incomplete` }
-                    : null,
-                  summary.data.servicesWithoutSchema > 0
-                    ? {
-                        tone: 'neutral' as const,
-                        text: `${summary.data.servicesWithoutSchema} without schema`,
-                      }
-                    : null,
-                  {
-                    tone: 'info' as const,
-                    text: `largest ${formatBytes(summary.data.largestMockBytes)}`,
-                  },
-                ].filter((note) => note !== null)
-              : []
-          }
+      <div className={styles.page}>
+        <ServingBand
+          activeScenarioId={facts?.activeScenarioId ?? null}
+          scenario={serving}
+          problems={problems}
         />
 
-        <div className={styles.row}>
-          <CapabilityCard
-            title="Phase 2"
-            description="Reserved for the next capability."
-            icon="planned"
-            to={null}
-            state="ready"
-            error={null}
-            stats={[]}
-            notes={[{ tone: 'neutral', text: 'not started' }]}
+        <MetricStrip metrics={metrics} />
+
+        <div className={styles.split}>
+          <ActivityPanel
+            entries={log.entries}
+            live={log.live}
+            sampled={log.sampled}
+            error={log.error}
           />
 
-          <CapabilityCard
-            title="Phase 3"
-            description="Reserved for a later capability."
-            icon="planned"
-            to={null}
-            state="ready"
-            error={null}
-            stats={[]}
-            notes={[{ tone: 'neutral', text: 'not started' }]}
+          <CoveragePanel
+            services={services.status === 'ready' ? services.data : []}
+            state={services.status}
+            error={services.status === 'error' ? services.error.message : null}
           />
         </div>
+
+        <RoadmapStrip />
       </div>
     </>
   );

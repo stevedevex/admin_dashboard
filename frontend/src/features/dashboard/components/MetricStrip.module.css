@@ -1,0 +1,70 @@
+.strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  background: var(--tao-surface);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-md);
+  overflow: hidden;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-1);
+  padding: var(--tao-space-4) var(--tao-space-5);
+  border-left: 1px solid var(--tao-border);
+}
+
+/* The first tile in each rendered row must not carry a divider. `auto-fit` means the row length
+   changes with the viewport, so the count is not known here — the leftmost is reset by position
+   instead, and the wrap case is covered by the outer border. */
+.tile:first-child {
+  border-left: 0;
+}
+
+.tileLink {
+  composes: tile;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+
+.tileLink:hover {
+  background: var(--tao-surface-sunken);
+}
+
+.tileLink:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: -2px;
+}
+
+.label {
+  font-size: var(--tao-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tao-text-muted);
+}
+
+/* Tabular figures so a column of numbers stays a column when the values change under polling. */
+.value {
+  font-size: var(--tao-text-2xl);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.note {
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.noteAttention {
+  composes: note;
+  color: var(--tao-warn);
+  font-weight: 600;
+}

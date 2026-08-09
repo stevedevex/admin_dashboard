@@ -1,0 +1,40 @@
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+  /* The baseline is drawn by the track, so a window with no traffic still reads as a chart
+     showing nothing rather than as a panel that failed to render. */
+  border-bottom: 1px solid var(--tao-border);
+}
+
+.slot {
+  display: flex;
+  align-items: flex-end;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.bar {
+  width: 100%;
+  /* A bar for a slice with traffic is never invisible: one call in a window whose peak is fifty
+     still rounds to a mark, and a gap must mean no calls rather than too few to draw. */
+  min-height: 1px;
+  background: var(--tao-info);
+  border-radius: 1px 1px 0 0;
+  transition: height 240ms ease;
+}
+
+.bar:empty {
+  background: var(--tao-info);
+}
+
+/* Stacked at the top of its own bar: the reader is scanning the tops of the bars, which is where
+   a failure should therefore appear. */
+.missed {
+  width: 100%;
+  min-height: 1px;
+  background: var(--tao-error);
+  border-radius: 1px 1px 0 0;
+}

@@ -3,7 +3,7 @@ import { PageHeader } from '@/app/layout/PageHeader';
 import { Button, EmptyState, Icon, MetaTag, Panel, Tag } from '@/ui';
 import { RequestDetailPanel } from './components/RequestDetailPanel';
 import { RequestTable } from './components/RequestTable';
-import { useRequestLog } from './hooks/useRequestLog';
+import { useRequestLog } from '@/hooks/useRequestLog';
 import styles from './RequestsPage.module.css';
 
 /**

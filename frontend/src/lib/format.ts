@@ -19,3 +19,17 @@ export function formatBytes(bytes: number): string {
   const decimals = unit === 0 || value >= 100 ? 0 : 1;
   return `${value.toFixed(decimals)} ${UNITS[unit]}`;
 }
+
+/**
+ * Local wall-clock time: the reader is comparing this against their own run, not against UTC.
+ *
+ * `millis` is for the log, where two calls a frame apart must be distinguishable; summaries drop
+ * them, since three digits of noise on every row buys nothing at a glance.
+ */
+export function formatClockTime(iso: string, options: { millis?: boolean } = {}): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+
+  const clock = at.toLocaleTimeString(undefined, { hour12: false });
+  return options.millis ? `${clock}.${String(at.getMilliseconds()).padStart(3, '0')}` : clock;
+}
