@@ -1,19 +1,25 @@
-.rows {
+.page {
   display: flex;
   flex-direction: column;
   gap: var(--tao-space-4);
+  /* Bounded so the ruled bands keep a readable measure on a wide monitor. Without it the metric
+     tiles drift to opposite edges of a 4K display and stop reading as one row. */
+  max-width: 1600px;
 }
 
-/* Capabilities that are built get a full row; placeholders share the next. */
-.row {
+/*
+ * The feed is given the larger share: it is the only region whose height is driven by content
+ * rather than by a fixed list, and it is what someone keeps the page open for.
+ */
+.split {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: var(--tao-space-4);
   align-items: start;
 }
 
-@media (max-width: 760px) {
-  .row {
+@media (max-width: 1000px) {
+  .split {
     grid-template-columns: 1fr;
   }
 }

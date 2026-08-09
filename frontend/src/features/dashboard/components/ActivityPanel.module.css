@@ -1,0 +1,121 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-3);
+}
+
+.chartHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tao-space-3);
+}
+
+.window {
+  font-size: var(--tao-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tao-text-muted);
+}
+
+.missedCount {
+  composes: window;
+  color: var(--tao-warn);
+  font-weight: 600;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-1);
+  font-size: var(--tao-text-sm);
+  color: var(--tao-text-muted);
+  text-decoration: none;
+}
+
+.more:hover {
+  color: var(--tao-accent);
+}
+
+.more:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: 2px;
+  border-radius: var(--tao-radius-sm);
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * Fixed columns so the list does not reflow as calls arrive. A feed that re-lays-out on every
+ * poll is unreadable precisely when it matters — while traffic is flowing.
+ */
+.entry {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 2.5rem minmax(0, 9rem);
+  align-items: center;
+  gap: var(--tao-space-3);
+  padding: var(--tao-space-2) 0;
+  border-top: 1px solid var(--tao-border);
+  font-size: var(--tao-text-sm);
+}
+
+.entry:first-child {
+  border-top: 0;
+}
+
+.time {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.target {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tao-space-2);
+  min-width: 0;
+}
+
+.service {
+  color: var(--tao-text-muted);
+  white-space: nowrap;
+}
+
+.operation {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--tao-text-muted);
+}
+
+.matched {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  justify-self: end;
+}
+
+/* Drop the answering file before anything else: at this width the feed is a pulse check, and
+   which mock replied is what the full log is for. */
+@media (max-width: 1400px) {
+  .entry {
+    grid-template-columns: 5rem minmax(0, 1fr) 2.5rem auto;
+  }
+}

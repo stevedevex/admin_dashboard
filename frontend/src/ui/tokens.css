@@ -55,6 +55,11 @@
   --tao-text-md: 0.875rem;
   --tao-text-lg: 1rem;
   --tao-text-xl: 1.375rem;
+  /* Display sizes, for figures that are the point of a panel rather than a label on one. The gap
+     above `xl` is deliberate: a hierarchy needs a step large enough to be read as a different
+     rank, and 1.375 → 1.75 → 2.75 is that. Nothing but a headline figure should reach these. */
+  --tao-text-2xl: 1.75rem;
+  --tao-text-3xl: 2.75rem;
 
   /* --- Space ----------------------------------------------------------- */
   --tao-space-1: 0.25rem;

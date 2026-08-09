@@ -1,4 +1,5 @@
 import type { RequestEntry } from '@/api';
+import { formatClockTime } from '@/lib/format';
 import { Icon, Tag } from '@/ui';
 import styles from './RequestTable.module.css';
 
@@ -7,16 +8,6 @@ export type RequestTableProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
 };
-
-/** Local wall-clock time: the reader is comparing this against their own run, not against UTC. */
-function timeOf(iso: string): string {
-  const at = new Date(iso);
-  return Number.isNaN(at.getTime())
-    ? iso
-    : at.toLocaleTimeString(undefined, { hour12: false }) +
-        '.' +
-        String(at.getMilliseconds()).padStart(3, '0');
-}
 
 export function RequestTable({ entries, selectedId, onSelect }: RequestTableProps) {
   return (
@@ -39,7 +30,9 @@ export function RequestTable({ entries, selectedId, onSelect }: RequestTableProp
               className={entry.id === selectedId ? styles.rowActive : styles.row}
               onClick={() => onSelect(entry.id)}
             >
-              <td className={`${styles.time} ${styles.mono}`}>{timeOf(entry.at)}</td>
+              <td className={`${styles.time} ${styles.mono}`}>
+                {formatClockTime(entry.at, { millis: true })}
+              </td>
               <td className={styles.service}>{entry.serviceId ?? '—'}</td>
               <td className={`${styles.operation} ${styles.mono}`}>{entry.operationId ?? '—'}</td>
               <td className={`${styles.status} ${styles.numeric}`}>
