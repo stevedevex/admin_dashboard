@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The service half of a split contract: binding and address only. Everything the operations
+     mean — messages, portType, schema — lives in the imported interface document. -->
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:tns="http://example.org/split"
+                  targetNamespace="http://example.org/split">
+
+  <wsdl:import namespace="http://example.org/split" location="split-interface.wsdl"/>
+
+  <wsdl:binding name="SplitBinding" type="tns:SplitPort">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <wsdl:operation name="Echo">
+      <soap:operation soapAction="http://example.org/split/Echo"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <wsdl:service name="SplitService">
+    <wsdl:port name="SplitPort" binding="tns:SplitBinding">
+      <soap:address location="http://real-host.example/split"/>
+    </wsdl:port>
+  </wsdl:service>
+
+</wsdl:definitions>

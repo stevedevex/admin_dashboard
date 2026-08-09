@@ -53,8 +53,16 @@ public class WsdlSpecLoader {
         Element definitions = wsdl.getDocumentElement();
         String targetNamespace = definitions.getAttribute("targetNamespace");
 
-        Map<QName, String> elementToOperation = mapBodyElementsToOperations(definitions, wsdl);
-        Map<String, String> soapActions = mapSoapActions(definitions);
+        Map<String, String> imports = collectAllSchemaReferences(service, definitions, problems);
+
+        // A contract split across WSDL documents — interface in one, binding and address in
+        // another, joined by <wsdl:import> — is a standard shape from contract-first .NET and
+        // Java stacks. Reading only the top-level document would find the binding and no
+        // operations, so every WSDL document reached by import contributes on equal terms.
+        List<Element> allDefinitions = withImportedWsdls(definitions, imports);
+
+        Map<QName, String> elementToOperation = mapBodyElementsToOperations(allDefinitions);
+        Map<String, String> soapActions = mapSoapActions(allDefinitions);
         List<String> declared = new ArrayList<>(soapActions.keySet());
         if (declared.isEmpty()) {
             declared = new ArrayList<>(elementToOperation.values());
@@ -95,20 +103,41 @@ public class WsdlSpecLoader {
             return null;
         }
 
-        Map<String, String> imports = collectAllSchemaReferences(service, definitions, problems);
-
         return new SoapServiceDefinition(
                 service.id(),
                 service.path(),
                 raw,
                 targetNamespace,
-                findAddress(definitions),
+                findAddress(allDefinitions),
                 elementToOperation,
                 served,
                 service.namespaces() == null ? Map.of() : service.namespaces(),
                 imports,
                 readResponseHeader(service, problems),
-                XsdExtractor.extract(service.id(), definitions, imports, problems));
+                XsdExtractor.extract(service.id(), allDefinitions, imports, problems));
+    }
+
+    /**
+     * The main document first, then every referenced document whose root is
+     * {@code wsdl:definitions}. Parse failures are not re-reported — the reference collector
+     * already named them.
+     */
+    private List<Element> withImportedWsdls(Element definitions, Map<String, String> imports) {
+        List<Element> all = new ArrayList<>();
+        all.add(definitions);
+
+        for (String content : imports.values()) {
+            try {
+                Element root = Xml.parse(content).getDocumentElement();
+                if (WSDL_NS.equals(root.getNamespaceURI()) && "definitions".equals(root.getLocalName())) {
+                    all.add(root);
+                }
+            } catch (RuntimeException e) {
+                // Already reported by collectAllSchemaReferences.
+            }
+        }
+
+        return all;
     }
 
     /** The service-wide envelope header, if one is configured. */
@@ -154,57 +183,65 @@ public class WsdlSpecLoader {
     }
 
     /**
-     * Builds body-element → operation.
+     * Builds body-element → operation, across every WSDL document of the contract.
      *
-     * <p>Walks portType operations to their input message, then the message part to its element.
-     * For RPC-style bindings there is no element, so the operation's own name in the target
-     * namespace is registered as a fallback.
+     * <p>Messages are indexed first from all documents, then portTypes are walked — the two
+     * routinely live in different documents of a split contract. For RPC-style bindings there is
+     * no input element, so the operation's own name in its document's target namespace is
+     * registered as a fallback.
      */
-    private Map<QName, String> mapBodyElementsToOperations(Element definitions, Document wsdl) {
+    private Map<QName, String> mapBodyElementsToOperations(List<Element> allDefinitions) {
         Map<String, QName> messageElements = new LinkedHashMap<>();
 
-        for (Element message : children(definitions, WSDL_NS, "message")) {
-            String messageName = message.getAttribute("name");
-            for (Element part : children(message, WSDL_NS, "part")) {
-                String element = part.getAttribute("element");
-                if (!element.isBlank()) {
-                    messageElements.put(messageName, resolveQName(element, part));
+        for (Element definitions : allDefinitions) {
+            for (Element message : children(definitions, WSDL_NS, "message")) {
+                String messageName = message.getAttribute("name");
+                for (Element part : children(message, WSDL_NS, "part")) {
+                    String element = part.getAttribute("element");
+                    if (!element.isBlank()) {
+                        messageElements.put(messageName, resolveQName(element, part));
+                    }
                 }
             }
         }
 
         Map<QName, String> byElement = new LinkedHashMap<>();
-        String targetNamespace = definitions.getAttribute("targetNamespace");
 
-        for (Element portType : children(definitions, WSDL_NS, "portType")) {
-            for (Element operation : children(portType, WSDL_NS, "operation")) {
-                String operationName = operation.getAttribute("name");
+        for (Element definitions : allDefinitions) {
+            String targetNamespace = definitions.getAttribute("targetNamespace");
 
-                QName inputElement = null;
-                for (Element input : children(operation, WSDL_NS, "input")) {
-                    String message = localPart(input.getAttribute("message"));
-                    inputElement = messageElements.get(message);
+            for (Element portType : children(definitions, WSDL_NS, "portType")) {
+                for (Element operation : children(portType, WSDL_NS, "operation")) {
+                    String operationName = operation.getAttribute("name");
+
+                    QName inputElement = null;
+                    for (Element input : children(operation, WSDL_NS, "input")) {
+                        String message = localPart(input.getAttribute("message"));
+                        inputElement = messageElements.get(message);
+                    }
+
+                    byElement.put(
+                            inputElement != null ? inputElement : new QName(targetNamespace, operationName),
+                            operationName);
                 }
-
-                byElement.put(
-                        inputElement != null ? inputElement : new QName(targetNamespace, operationName),
-                        operationName);
             }
         }
 
         return byElement;
     }
 
-    private Map<String, String> mapSoapActions(Element definitions) {
+    private Map<String, String> mapSoapActions(List<Element> allDefinitions) {
         Map<String, String> actions = new LinkedHashMap<>();
-        for (Element binding : children(definitions, WSDL_NS, "binding")) {
-            for (Element operation : children(binding, WSDL_NS, "operation")) {
-                String name = operation.getAttribute("name");
-                String action = "";
-                for (Element soapOperation : children(operation, SOAP_NS, "operation")) {
-                    action = soapOperation.getAttribute("soapAction");
+        for (Element definitions : allDefinitions) {
+            for (Element binding : children(definitions, WSDL_NS, "binding")) {
+                for (Element operation : children(binding, WSDL_NS, "operation")) {
+                    String name = operation.getAttribute("name");
+                    String action = "";
+                    for (Element soapOperation : children(operation, SOAP_NS, "operation")) {
+                        action = soapOperation.getAttribute("soapAction");
+                    }
+                    actions.put(name, action);
                 }
-                actions.put(name, action);
             }
         }
         return actions;
@@ -321,11 +358,13 @@ public class WsdlSpecLoader {
         return locations;
     }
 
-    private String findAddress(Element definitions) {
-        for (Element service : children(definitions, WSDL_NS, "service")) {
-            for (Element port : children(service, WSDL_NS, "port")) {
-                for (Element address : children(port, SOAP_NS, "address")) {
-                    return address.getAttribute("location");
+    private String findAddress(List<Element> allDefinitions) {
+        for (Element definitions : allDefinitions) {
+            for (Element service : children(definitions, WSDL_NS, "service")) {
+                for (Element port : children(service, WSDL_NS, "port")) {
+                    for (Element address : children(port, SOAP_NS, "address")) {
+                        return address.getAttribute("location");
+                    }
                 }
             }
         }

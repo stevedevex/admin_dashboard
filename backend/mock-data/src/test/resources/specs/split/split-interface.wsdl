@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The interface half of a split contract: types, messages, portType — no binding, no address.
+     Referenced from split-service.wsdl by <wsdl:import>. -->
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                  xmlns:tns="http://example.org/split"
+                  targetNamespace="http://example.org/split">
+
+  <wsdl:types>
+    <xsd:schema targetNamespace="http://example.org/split" elementFormDefault="qualified">
+      <xsd:element name="EchoRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="text" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="EchoResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="text" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </wsdl:types>
+
+  <wsdl:message name="EchoIn">
+    <wsdl:part name="parameters" element="tns:EchoRequest"/>
+  </wsdl:message>
+  <wsdl:message name="EchoOut">
+    <wsdl:part name="parameters" element="tns:EchoResponse"/>
+  </wsdl:message>
+
+  <wsdl:portType name="SplitPort">
+    <wsdl:operation name="Echo">
+      <wsdl:input message="tns:EchoIn"/>
+      <wsdl:output message="tns:EchoOut"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+</wsdl:definitions>

@@ -49,13 +49,18 @@ final class XsdExtractor {
     private XsdExtractor() {}
 
     static SoapSchemas extract(
-            String serviceId, Element definitions, Map<String, String> referenced, List<String> problems) {
+            String serviceId,
+            List<Element> allDefinitions,
+            Map<String, String> referenced,
+            List<String> problems) {
 
         List<Document> inline = new ArrayList<>();
-        for (Element schema : inlineSchemas(definitions)) {
-            String text = serialise(schema);
-            if (text != null) {
-                inline.add(Xml.parse(text));
+        for (Element definitions : allDefinitions) {
+            for (Element schema : inlineSchemas(definitions)) {
+                String text = serialise(schema);
+                if (text != null) {
+                    inline.add(Xml.parse(text));
+                }
             }
         }
 
@@ -83,7 +88,7 @@ final class XsdExtractor {
             return SoapSchemas.none("The WSDL declares no schema, inline or referenced");
         }
 
-        Map<String, QName> responses = responseElements(definitions);
+        Map<String, QName> responses = responseElements(allDefinitions);
         if (responses.isEmpty()) {
             return SoapSchemas.none(
                     "No operation declares a response element — an RPC-style binding has none to declare");
@@ -238,27 +243,34 @@ final class XsdExtractor {
         };
     }
 
-    /** operation name → the element its response payload must be. */
-    private static Map<String, QName> responseElements(Element definitions) {
+    /**
+     * operation name → the element its response payload must be. Messages and portTypes may live
+     * in different documents of a split contract, so both walks span all of them.
+     */
+    private static Map<String, QName> responseElements(List<Element> allDefinitions) {
         Map<String, QName> messageElements = new LinkedHashMap<>();
 
-        for (Element message : children(definitions, WSDL_NS, "message")) {
-            for (Element part : children(message, WSDL_NS, "part")) {
-                String element = part.getAttribute("element");
-                if (!element.isBlank()) {
-                    messageElements.put(message.getAttribute("name"), resolve(element, part));
+        for (Element definitions : allDefinitions) {
+            for (Element message : children(definitions, WSDL_NS, "message")) {
+                for (Element part : children(message, WSDL_NS, "part")) {
+                    String element = part.getAttribute("element");
+                    if (!element.isBlank()) {
+                        messageElements.put(message.getAttribute("name"), resolve(element, part));
+                    }
                 }
             }
         }
 
         Map<String, QName> byOperation = new LinkedHashMap<>();
 
-        for (Element portType : children(definitions, WSDL_NS, "portType")) {
-            for (Element operation : children(portType, WSDL_NS, "operation")) {
-                for (Element output : children(operation, WSDL_NS, "output")) {
-                    QName element = messageElements.get(localPart(output.getAttribute("message")));
-                    if (element != null) {
-                        byOperation.put(operation.getAttribute("name"), element);
+        for (Element definitions : allDefinitions) {
+            for (Element portType : children(definitions, WSDL_NS, "portType")) {
+                for (Element operation : children(portType, WSDL_NS, "operation")) {
+                    for (Element output : children(operation, WSDL_NS, "output")) {
+                        QName element = messageElements.get(localPart(output.getAttribute("message")));
+                        if (element != null) {
+                            byOperation.put(operation.getAttribute("name"), element);
+                        }
                     }
                 }
             }
