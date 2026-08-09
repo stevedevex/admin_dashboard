@@ -58,6 +58,7 @@ mocks/scenarios/<scenario>/scenario.yaml            # name, description, extends
                                                   /_default.<ext>        # fallback
                                                   /<stem>.meta.yaml      # optional: status, headers, kind
                                                   /<stem>.header.xml     # optional: SOAP envelope header
+                                                  /<stem>.request.<ext>  # optional: the call it was written for
 ```
 
 Resolution tries the most specific name first (`petid=1.json`), then `_default`, walking the
@@ -168,6 +169,32 @@ tao.sandbox:
 When the buffer has wrapped past a reader's cursor, the log says so (`"mode": "SAMPLED"`) rather
 than silently presenting a thinned history as the whole one. Capturing a long load-test run
 means raising `capacity` for that instance, not trusting the defaults.
+
+## Writing a mock from a call that missed
+
+The quickest way to add a mock is to let a real call ask for it. Point your application at the
+sandbox and run it: any call with no mock gets a loud diagnostic and lands in the request log.
+Then `GET /__tao/requests/{id}/draft` answers with the mock that call was asking for —
+
+```json
+{
+  "mockId":   "baseline/calculator/Divide/inta=10&intb=5.xml",
+  "keys":     { "intA": "10", "intB": "5" },
+  "exists":   false,
+  "skeleton": "<DivideResponse xmlns=\"http://tempuri.org/\">\n  <DivideResult></DivideResult>\n</DivideResponse>",
+  "requestBody": "<soapenv:Envelope …>"
+}
+```
+
+— and nothing is created. Fill the skeleton in, `PUT` it to that `mockId` like any other mock, and
+the same call now resolves. Pass the `requestBody` back as `request` on the save and it is kept
+beside the payload as `<stem>.request.xml`, which answers the question a reader has months later:
+what does a call that lands here actually look like?
+
+The file name comes from the keys the resolver already extracted, normalised the same way — which
+is why this beats naming files by hand. **The stored request is never matched against.** Resolution
+reads declared keys and nothing else, deliberately: matching a stored request against an incoming
+one breaks the first time a correlation id or a timestamp moves.
 
 ## Testing what you added
 

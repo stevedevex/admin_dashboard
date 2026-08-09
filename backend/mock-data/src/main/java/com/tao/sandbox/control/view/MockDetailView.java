@@ -8,6 +8,8 @@ import com.tao.sandbox.store.MockMeta;
  * @param summary the same metadata the list carries, so opening a file is one call rather than a
  *     fetch plus a join against the listing — and so the size and state shown beside a payload
  *     cannot disagree with the tree that led to it
+ * @param request the call this mock was written for, when it was created from a recorded one.
+ *     Documentation, never a matcher — see {@link com.tao.sandbox.store.MockDocument#request}.
  * @param meta what the sidecar declares. Nulls mean "not specified".
  * @param effective what a client would actually receive, once the contract's defaults are applied
  */
@@ -16,6 +18,7 @@ public record MockDetailView(
         MockSummaryView summary,
         String body,
         String envelopeHeader,
+        String request,
         MockMeta meta,
         Effective effective) {
 

@@ -204,7 +204,7 @@ public class FilesystemMockRepository implements MockRepository {
             throw new UncheckedIOException("Could not write " + path, e);
         }
 
-        Sidecars.write(path, document.envelopeHeader(), document.meta());
+        Sidecars.write(path, document.envelopeHeader(), document.meta(), document.request());
 
         CachedMock cached = load(id, path);
         mocks.put(keyFor(id), cached);
@@ -426,7 +426,8 @@ public class FilesystemMockRepository implements MockRepository {
             return new MockDocument(
                     Files.readString(path, StandardCharsets.UTF_8),
                     Sidecars.readEnvelopeHeader(path),
-                    Sidecars.readMeta(path));
+                    Sidecars.readMeta(path),
+                    Sidecars.readRequest(path));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read " + path, e);
         }

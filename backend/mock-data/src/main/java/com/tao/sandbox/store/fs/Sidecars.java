@@ -21,19 +21,28 @@ import org.yaml.snakeyaml.Yaml;
  *   tickersymbol=ibm.xml           the payload — valid against its own schema, nothing else in it
  *   tickersymbol=ibm.meta.yaml     status, HTTP headers, kind
  *   tickersymbol=ibm.header.xml    the SOAP envelope header
+ *   tickersymbol=ibm.request.xml   the call this mock was written for — documentation only
  * </pre>
  *
  * <p>The envelope header is a separate XML file rather than a field in the YAML for two reasons:
  * {@code headers:} in the meta sidecar already means <em>HTTP</em> headers, and putting an
  * envelope header next to it invites exactly the confusion the naming suggests; and XML kept as
  * XML stays editable, highlightable and validatable instead of becoming a YAML block scalar.
+ *
+ * <p>The request sidecar is <em>never matched against</em>. Resolution reads declared keys and
+ * nothing else, deliberately: matching a stored request against an incoming one breaks the first
+ * time a correlation id or a timestamp moves. What it answers is the question a reader has six
+ * months later — what does a call that lands here actually look like, and which of its fields
+ * mattered.
  */
 final class Sidecars {
 
     static final String META = ".meta.yaml";
     static final String ENVELOPE_HEADER = ".header.xml";
+    static final String REQUEST_XML = ".request.xml";
+    static final String REQUEST_JSON = ".request.json";
 
-    private static final List<String> ALL = List.of(META, ENVELOPE_HEADER);
+    private static final List<String> ALL = List.of(META, ENVELOPE_HEADER, REQUEST_XML, REQUEST_JSON);
 
     private Sidecars() {}
 
@@ -70,6 +79,25 @@ final class Sidecars {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read " + sidecar, e);
         }
+    }
+
+    /** The call this mock was written for, whichever form it was stored in, or null. */
+    static String readRequest(Path payload) {
+        for (String suffix : List.of(REQUEST_XML, REQUEST_JSON)) {
+            Path sidecar = pathFor(payload, suffix);
+            if (!Files.isRegularFile(sidecar)) {
+                continue;
+            }
+            try {
+                String content = Files.readString(sidecar, StandardCharsets.UTF_8).strip();
+                if (!content.isEmpty()) {
+                    return content;
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Could not read " + sidecar, e);
+            }
+        }
+        return null;
     }
 
     static MockMeta readMeta(Path payload) {
@@ -128,9 +156,29 @@ final class Sidecars {
      * screen would explain why. So "not specified" is written by deleting the file, never by
      * leaving the previous one in place.
      */
-    static void write(Path payload, String envelopeHeader, MockMeta meta) {
+    static void write(Path payload, String envelopeHeader, MockMeta meta, String request) {
         writeOrDelete(pathFor(payload, ENVELOPE_HEADER), blankToNull(envelopeHeader));
         writeOrDelete(pathFor(payload, META), render(meta));
+        writeRequest(payload, blankToNull(request));
+    }
+
+    /**
+     * Stored in the form it arrived in, so it stays highlightable — and only one form at a time,
+     * or a mock rewritten from a JSON call would keep an XML request beside it claiming otherwise.
+     *
+     * <p>Unlike the other two, absence here does not clear what is stored: provenance is written
+     * once by whoever created the mock from a recorded call, and every ordinary save afterwards
+     * carries no request. Deleting on those saves would throw the record away the first time
+     * anyone edited a payload.
+     */
+    private static void writeRequest(Path payload, String request) {
+        if (request == null) {
+            return;
+        }
+
+        boolean xml = request.stripLeading().startsWith("<");
+        writeOrDelete(pathFor(payload, xml ? REQUEST_JSON : REQUEST_XML), null);
+        writeOrDelete(pathFor(payload, xml ? REQUEST_XML : REQUEST_JSON), request);
     }
 
     private static void writeOrDelete(Path sidecar, String content) {

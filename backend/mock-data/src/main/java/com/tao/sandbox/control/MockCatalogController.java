@@ -140,7 +140,13 @@ class MockCatalogController {
                 new MockDocument(
                         request.body(),
                         request.envelopeHeader(),
-                        request.meta() == null ? MockMeta.none() : request.meta());
+                        request.meta() == null ? MockMeta.none() : request.meta(),
+                        // Absent means "leave whatever is recorded", not "clear it": an ordinary
+                        // save carries no request, and only the first save from a recorded call
+                        // ever has one to offer.
+                        request.request() != null
+                                ? request.request()
+                                : existing.map(MockDocument::request).orElse(null));
 
         try {
             repository.save(mockId, document);
@@ -298,6 +304,7 @@ class MockCatalogController {
                 summarise(id),
                 document.body(),
                 document.envelopeHeader(),
+                document.request(),
                 document.meta(),
                 effective(id, document));
     }

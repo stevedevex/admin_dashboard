@@ -689,6 +689,62 @@ class ControlPanelWriteTest {
         assertThat(draft).bodyJson().extractingPath("$.note").asString().contains("intA");
     }
 
+    /**
+     * The call that motivated a mock is stored beside it — and stays there through later edits,
+     * since every ordinary save carries no request and clearing on those would throw the record
+     * away the first time anyone touched the payload.
+     */
+    @Test
+    void theCallThatMotivatedAMockIsKeptBesideIt() {
+        String id = "baseline/petstore/showPetById/petid=808.json";
+
+        mvc.put()
+                .uri("/__tao/mocks/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        """
+                        { "body": "{ \\"id\\": 808 }",
+                          "request": "{ \\"probe\\": \\"the call this was written for\\" }" }""")
+                .exchange();
+
+        MvcTestResult read = mvc.get().uri("/__tao/mocks/" + id).exchange();
+        assertThat(read).bodyJson().extractingPath("$.request").asString().contains("written for");
+
+        // An edit that says nothing about provenance must not erase it.
+        mvc.put()
+                .uri("/__tao/mocks/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", read.getResponse().getHeader("ETag"))
+                .content("""
+                        { "body": "{ \\"id\\": 808, \\"name\\": \\"Edited\\" }" }""")
+                .exchange();
+
+        assertThat(mvc.get().uri("/__tao/mocks/" + id).exchange())
+                .bodyJson()
+                .extractingPath("$.request")
+                .asString()
+                .contains("written for");
+    }
+
+    /** Provenance is documentation: it must never appear as a mock in its own right. */
+    @Test
+    void theStoredCallIsNotListedAsAMock() {
+        String id = "baseline/petstore/showPetById/petid=809.json";
+
+        mvc.put()
+                .uri("/__tao/mocks/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        { "body": "{ \\"id\\": 809 }", "request": "{ \\"probe\\": 1 }" }""")
+                .exchange();
+
+        assertThat(mvc.get().uri("/__tao/mocks?scenario=baseline&service=petstore").exchange())
+                .bodyJson()
+                .extractingPath("$[*].fileName")
+                .asArray()
+                .doesNotContain("petid=809.request.json");
+    }
+
     /** A request rejected before resolution has no contract to write a mock against. */
     @Test
     void aCallRejectedBeforeResolutionCannotBeDrafted() {
