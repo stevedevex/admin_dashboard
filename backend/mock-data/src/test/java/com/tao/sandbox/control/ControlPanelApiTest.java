@@ -38,6 +38,33 @@ class ControlPanelApiTest {
         assertThat(result).bodyJson().extractingPath("$.root").asString().endsWith("mocks");
     }
 
+    /**
+     * Without this a browser applies heuristic freshness to an ETagged response and reuses it
+     * without asking — the dashboard then shows a verdict it has already superseded. It must be
+     * {@code no-store} rather than {@code no-cache}: the ETag covers the payload, not the
+     * validation verdict beside it, so a conditional request would answer 304 and replay the
+     * stale verdict quite correctly. See {@link ControlPanelCacheControl}.
+     */
+    @Test
+    void controlPanelAnswersMustBeRevalidatedRatherThanReused() {
+        assertThat(mvc.get().uri("/__tao/status").exchange().getResponse().getHeader("Cache-Control"))
+                .isEqualTo("no-store");
+        assertThat(
+                        mvc.get()
+                                .uri("/__tao/mocks/baseline/petstore/showPetById/petid=1.json")
+                                .exchange()
+                                .getResponse()
+                                .getHeader("Cache-Control"))
+                .isEqualTo("no-store");
+    }
+
+    /** The data plane speaks its upstream's language, headers included — we add nothing to it. */
+    @Test
+    void theDataPlaneKeepsItsOwnCachingBehaviour() {
+        assertThat(mvc.get().uri("/petstore/v1/pets/1").exchange().getResponse().getHeader("Cache-Control"))
+                .isNull();
+    }
+
     /** One call for the dashboard's headline numbers; counting is the server's job. */
     @Test
     void theSummaryCarriesTheDashboardsHeadlineNumbers() {

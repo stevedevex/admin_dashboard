@@ -294,7 +294,27 @@ class MockCatalogController {
 
     private MockDetailView detail(MockId id, MockDocument document) {
         return new MockDetailView(
-                id.asPath(), document.body(), document.envelopeHeader(), document.meta(), effective(id, document));
+                id.asPath(),
+                summarise(id),
+                document.body(),
+                document.envelopeHeader(),
+                document.meta(),
+                effective(id, document));
+    }
+
+    /**
+     * The listing's metadata for one mock, found by asking the store for its scenario's list.
+     *
+     * <p>Taken from the same call the tree renders from, so the two cannot disagree. Null only for
+     * a mock that exists on disk but is not yet indexed — an author's file dropped in since the
+     * last reload, which {@link MockRepository#get} still serves so the editor can show it.
+     */
+    private MockSummaryView summarise(MockId id) {
+        return repository.list(id.scenarioId(), id.serviceId()).stream()
+                .filter(mock -> mock.id().equals(id))
+                .findFirst()
+                .map(this::describe)
+                .orElse(null);
     }
 
     /**
