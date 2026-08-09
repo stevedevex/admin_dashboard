@@ -1,1 +1,5 @@
-{ "id": 0, "name": "Unnamed", "tag": "unknown" }
+{
+  "id" : 0,
+  "name" : "",
+  "tag" : ""
+}
