@@ -1,0 +1,30 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-4);
+  padding: var(--tao-space-4) 0 var(--tao-space-5);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--tao-text-xl);
+  font-weight: 400;
+  color: var(--tao-text);
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tao-space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  margin-left: auto;
+}

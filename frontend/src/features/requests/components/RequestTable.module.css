@@ -1,0 +1,119 @@
+/* The log scrolls inside its panel; the page itself must not grow with traffic. Vertically only:
+   a horizontal scrollbar would put "did it match" — the reason this page is open — off the edge. */
+.scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+/*
+ * Fixed layout, so a long operation name or a deep mock path ellipsizes inside its own cell rather
+ * than widening the table and pushing the last column out of view.
+ *
+ * Widths are intrinsic rather than percentages: a status is three characters at any viewport, and
+ * a percentage share of a narrow pane truncates it to "2…" — which is worse than useless, since it
+ * still looks like data. Everything left over goes to the answered column, which holds a path and
+ * is the only one that genuinely wants more room.
+ */
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--tao-text-sm);
+}
+
+.time {
+  width: 8rem;
+}
+
+.service {
+  width: 8rem;
+}
+
+.operation {
+  width: 11rem;
+}
+
+.status {
+  width: 5rem;
+}
+
+.took {
+  width: 5rem;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--tao-space-2) var(--tao-space-4);
+  text-align: left;
+  font-size: var(--tao-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tao-text-muted);
+  background: var(--tao-surface-sunken);
+  border-bottom: 1px solid var(--tao-border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--tao-space-2) var(--tao-space-4);
+  border-bottom: 1px solid var(--tao-border);
+  color: var(--tao-text);
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--tao-surface-sunken);
+}
+
+.rowActive {
+  composes: row;
+  background: var(--tao-surface-sunken);
+}
+
+/* Matches the tree and the rail: the selected thing carries an accent edge. */
+.rowActive td:first-child {
+  box-shadow: inset 3px 0 0 var(--tao-accent);
+}
+
+.mono {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.answered {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Shed columns rather than squeezing every one of them. Duration goes first — it is the only
+ * column nobody opens this page to read — and the service next, since the operation name already
+ * implies it. What is never dropped: the time, the status, and whether a mock answered.
+ */
+@media (max-width: 1200px) {
+  .took {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .service {
+    display: none;
+  }
+}

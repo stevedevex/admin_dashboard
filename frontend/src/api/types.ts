@@ -1,0 +1,253 @@
+/**
+ * Data contracts.
+ *
+ * Deliberately domain-neutral: this describes *a* mock server, not any
+ * particular one. Everything specific — protocols, field names, endpoints —
+ * arrives as data from the backend and is never enumerated here.
+ */
+
+/** One field the resolver extracts, as the server names it. */
+export type KeyField = {
+  /** The short name used in file names and traces — `tickerSymbol`, not the xpath it came from. */
+  name: string;
+  /** Where it is read from: PATH, QUERY, HEADER, BODY, XPATH. */
+  source: string;
+  expression: string;
+};
+
+/** An operation a service serves, and what identifies a request to it. */
+export type Operation = {
+  id: string;
+  method: string;
+  path: string;
+  keys: KeyField[];
+};
+
+/** A mocked upstream endpoint. `protocol` is free-form: the backend names it. */
+export type Service = {
+  id: string;
+  name: string;
+  protocol: string;
+  endpoint: string;
+  format: MockFormat;
+  hasSchema: boolean;
+  /** Fields the resolver extracts from a request, in priority order. */
+  keyFields: string[];
+  operations: Operation[];
+  mockCount: number;
+};
+
+/**
+ * The file name a set of key values resolves to, computed by the server.
+ *
+ * Never derived on this side. Normalisation — lowercasing, trimming, stripping leading zeros —
+ * decides whether a saved mock is ever reachable, and a second implementation here would drift
+ * silently: a file that exists and no request resolves to.
+ *
+ * @param normalised what each value became on the way, so an author sees that `00005678` is
+ *   stored as `5678` rather than discovering it when the mock they saved is not the one served
+ */
+export type MockName = {
+  fileName: string;
+  normalised: Record<string, string>;
+};
+
+/** An operation's declared response schema, and an empty payload shaped like it. */
+export type OperationSchema = {
+  format: string;
+  available: boolean;
+  schema: string | null;
+  reason: string | null;
+  skeleton: string | null;
+};
+
+export type MockFormat = 'xml' | 'json' | 'text';
+
+/** State of a single mock file, as assessed by the backend. */
+export type MockState = 'valid' | 'incomplete' | 'invalid' | 'unchecked';
+
+/** Metadata only — payload bytes are fetched separately and never listed. */
+export type MockSummary = {
+  id: string;
+  fileName: string;
+  serviceId: string;
+  /** Operations within a service answer different shapes, so each is its own namespace. */
+  operationId: string;
+  scenarioId: string;
+  format: MockFormat;
+  sizeBytes: number;
+  state: MockState;
+  /** Percentage of schema-declared fields populated, when a schema exists. */
+  completeness: number | null;
+  /** True when served from a parent scenario rather than this one. */
+  inherited: boolean;
+  modifiedAt: string;
+};
+
+export type MockContent = MockSummary & {
+  body: string;
+  /**
+   * The call this mock was written for, when it was created from a recorded one. Documentation,
+   * never a matcher: resolution reads declared keys and nothing else.
+   */
+  request: string | null;
+  /**
+   * What a client actually receives, once the contract's defaults are applied over anything the
+   * mock overrides. Shown beside the payload because a mock answering 201 with nothing of its own
+   * got that from its contract, and there is otherwise no way to discover it.
+   */
+  effective: { status: number; contentType: string };
+};
+
+export type Scenario = {
+  id: string;
+  name: string;
+  description: string;
+  /** Parent scenario this one inherits from, if any. */
+  extends: string | null;
+  serviceIds: string[];
+  mockCount: number;
+};
+
+/**
+ * Headline numbers for one capability, for the dashboard.
+ *
+ * A single call per capability rather than the dashboard fanning out and
+ * counting client-side — that stays cheap as the mock library grows, and it
+ * keeps "what counts as invalid" a server decision.
+ */
+export type MockDataSummary = {
+  serviceCount: number;
+  servicesWithoutSchema: number;
+  scenarioCount: number;
+  activeScenarioId: string;
+  mockCount: number;
+  invalidCount: number;
+  incompleteCount: number;
+  largestMockBytes: number;
+};
+
+export type ValidationIssue = {
+  path: string;
+  line: number | null;
+  message: string;
+  rule: string;
+};
+
+export type ValidationResult = {
+  valid: boolean;
+  /**
+   * What was actually verified.
+   *
+   * `syntax` means the payload parses but nothing checked it against a schema;
+   * reporting that as plain "valid" would let a schema-invalid mock look clean.
+   * `none` is the honest answer for formats with no validator at all.
+   */
+  checked: 'schema' | 'syntax' | 'none';
+  completeness: number | null;
+  issues: ValidationIssue[];
+};
+
+/**
+ * A request described rather than sent.
+ *
+ * Two shapes, because the protocols identify an operation differently: REST is described, since
+ * its method and path carry meaning no body contains; SOAP is pasted whole, since the envelope
+ * carries everything and whoever is debugging one has it on their clipboard already.
+ */
+export type ResolveRequest = {
+  scenarioId?: string;
+  /** Present means REST. Absent means the body is a SOAP envelope. */
+  method?: string;
+  path?: string;
+  body?: string;
+};
+
+/**
+ * Where a request would have resolved, and what was tried on the way.
+ *
+ * `discarded` is the point of asking: seeing a correlation id or a timestamp listed there is what
+ * turns "it did not match" into "of course, that is not what identifies it".
+ *
+ * `matched` being null is a successful answer describing a miss, not a failure.
+ */
+export type ResolutionTrace = {
+  serviceId: string;
+  operationId: string;
+  scenarioId: string;
+  extracted: Record<string, string>;
+  discarded: string[];
+  attempted: string[];
+  matched: string | null;
+  inherited: boolean;
+  tookMillis: number;
+};
+
+/**
+ * One call the application under test made.
+ *
+ * Bodies are absent here and fetched per entry: a log page listing megabyte payloads would be
+ * unusable, and they are one click away on the entry someone actually opens.
+ *
+ * `operationId` is null for a request rejected before resolution — a malformed envelope, or an
+ * operation the contract declares but configuration does not serve. Those are recorded rather
+ * than dropped: a client sending nothing the sandbox understands otherwise sees an empty log,
+ * which reads as "my requests are not arriving".
+ */
+export type RequestEntry = {
+  id: string;
+  at: string;
+  serviceId: string | null;
+  operationId: string | null;
+  scenarioId: string | null;
+  status: number;
+  tookMillis: number;
+  /** The mock that answered, or null on a miss. The misses are what the log is opened for. */
+  matched: string | null;
+  inherited: boolean;
+};
+
+/** An entry with everything the trace recorded. */
+export type RequestDetail = RequestEntry & {
+  extracted: Record<string, string>;
+  attempted: string[];
+  requestBody: string | null;
+  responseBody: string | null;
+  /** Set when a body was longer than the retained limit, so nobody reads a cut-off payload as whole. */
+  bodiesTruncated: boolean;
+};
+
+/**
+ * The mock a recorded call is asking for.
+ *
+ * A proposal — nothing exists until an author fills the payload in and saves it. `note` explains
+ * a name that is not the obvious one: a call whose keys did not satisfy the operation's strategy
+ * was answered by the operation's default, and a file named from the partial keys would sit there
+ * unreachable.
+ */
+export type MockDraft = {
+  mockId: string;
+  serviceId: string;
+  operationId: string;
+  scenarioId: string;
+  fileName: string;
+  keys: Record<string, string>;
+  /** True when something is already stored there, so the dashboard can warn before overwriting. */
+  exists: boolean;
+  /** An empty payload shaped like the declared response, or null when nothing declares one. */
+  skeleton: string | null;
+  requestBody: string | null;
+  note: string | null;
+};
+
+/**
+ * @param mode `sampled` when the ring buffer wrapped past the caller's cursor, so some requests
+ *   were lost. It must be said out loud: a silently truncating log is worse than none, because
+ *   quiet reads as "no traffic".
+ * @param cursor pass back as `since` to fetch only what arrived after this page
+ */
+export type RequestPage = {
+  mode: 'full' | 'sampled';
+  cursor: string;
+  entries: RequestEntry[];
+};

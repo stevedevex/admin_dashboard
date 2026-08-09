@@ -1,0 +1,29 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--tao-font-sans);
+  font-size: var(--tao-text-md);
+  color: var(--tao-text);
+  background: var(--tao-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Small shared helpers. Anything larger belongs in a CSS Module. */
+.muted {
+  color: var(--tao-text-muted);
+}
+
+.pad-4 {
+  padding: var(--tao-space-4);
+}

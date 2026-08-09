@@ -1,0 +1,31 @@
+.input {
+  width: 100%;
+  padding: var(--tao-space-2) var(--tao-space-3);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-bg);
+  font-family: inherit;
+  font-size: var(--tao-text-sm);
+  color: var(--tao-text);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: -1px;
+}
+
+.input:disabled {
+  background: var(--tao-surface-sunken);
+  color: var(--tao-text-muted);
+  cursor: not-allowed;
+}
+
+/* For values read character by character — ids, paths, file names. */
+.mono {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+}
+
+.select {
+  appearance: auto;
+}

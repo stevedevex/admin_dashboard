@@ -1,0 +1,62 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-1);
+  padding: 2px var(--tao-space-2);
+  border-radius: var(--tao-radius-sm);
+  font-size: var(--tao-text-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.icon {
+  display: inline-flex;
+  line-height: 1;
+}
+
+.neutral {
+  background: var(--tao-neutral-100);
+  color: var(--tao-text-muted);
+}
+.info {
+  background: var(--tao-info-subtle);
+  color: var(--tao-info);
+}
+.ok {
+  background: var(--tao-ok-subtle);
+  color: var(--tao-ok);
+}
+.warn {
+  background: var(--tao-warn-subtle);
+  color: var(--tao-warn);
+}
+.error {
+  background: var(--tao-error-subtle);
+  color: var(--tao-error);
+}
+.accent {
+  background: var(--tao-accent-subtle);
+  color: var(--tao-accent);
+}
+
+.meta {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-sm);
+  font-size: var(--tao-text-xs);
+  overflow: hidden;
+}
+
+.metaLabel {
+  padding: 3px var(--tao-space-2);
+  background: var(--tao-surface-sunken);
+  color: var(--tao-text-muted);
+  border-right: 1px solid var(--tao-border);
+}
+
+.metaValue {
+  padding: 3px var(--tao-space-2);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}

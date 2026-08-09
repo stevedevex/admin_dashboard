@@ -1,0 +1,36 @@
+/*
+ * The editor library renders its own wrapper element between this container
+ * and `.cm-editor`, and that wrapper has no height of its own. Relying on
+ * `height: 100%` through that chain collapsed the editor to one line: the
+ * content was clipped and could not be scrolled.
+ *
+ * Sizing by flex instead of percentage gives every level a definite height
+ * without depending on the library's internal markup or class names.
+ */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.wrap > * {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wrap :global(.cm-editor) {
+  flex: 1;
+  min-height: 0;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: var(--tao-text-sm);
+  color: var(--tao-text-muted);
+}

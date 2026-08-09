@@ -1,0 +1,107 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-2) var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+}
+
+.method {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}
+
+/* Takes the room the verb and the button leave: a path is the long part. */
+.path {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}
+
+.editor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.error {
+  margin: 0;
+  padding: var(--tao-space-3);
+  border-top: 1px solid var(--tao-border);
+  font-size: var(--tao-text-sm);
+  color: var(--tao-error);
+}
+
+.trace {
+  padding: var(--tao-space-3);
+  border-top: 1px solid var(--tao-border);
+  background: var(--tao-surface-sunken);
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tao-space-2);
+  margin-bottom: var(--tao-space-1);
+}
+
+.label {
+  font-size: var(--tao-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tao-text-muted);
+}
+
+.mono {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+}
+
+.muted {
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}
+
+/* The matched file opens in the editor beside this, which is the next thing anyone wants. */
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.attempts {
+  margin: var(--tao-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attempt {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}

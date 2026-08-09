@@ -1,0 +1,59 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-2) var(--tao-space-3);
+  border-top: 1px solid var(--tao-border);
+  background: var(--tao-surface-sunken);
+}
+
+.caveat {
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  max-height: 140px;
+  overflow: auto;
+  list-style: none;
+  border-top: 1px solid var(--tao-border);
+  background: var(--tao-error-subtle);
+}
+
+.issue {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-2) var(--tao-space-3);
+  font-size: var(--tao-text-xs);
+}
+
+.issue + .issue {
+  border-top: 1px solid var(--tao-border);
+}
+
+.icon {
+  align-self: center;
+  color: var(--tao-error);
+}
+
+.line {
+  flex: 0 0 auto;
+  font-family: var(--tao-font-mono);
+  color: var(--tao-error);
+  white-space: nowrap;
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  color: var(--tao-text);
+}
+
+.path {
+  font-family: var(--tao-font-mono);
+  color: var(--tao-text-muted);
+  white-space: nowrap;
+}

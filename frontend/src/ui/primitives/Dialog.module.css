@@ -1,0 +1,82 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 40%);
+}
+
+.content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+  padding: var(--tao-space-5);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-md);
+  background: var(--tao-surface);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--tao-text-lg);
+  font-weight: 600;
+  color: var(--tao-text);
+}
+
+.description {
+  margin: var(--tao-space-1) 0 0;
+  font-size: var(--tao-text-sm);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}
+
+/* Present for assistive technology, absent on screen. */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-4);
+  margin-top: var(--tao-space-4);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--tao-space-2);
+  margin-top: var(--tao-space-5);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-1);
+}
+
+.label {
+  font-size: var(--tao-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tao-text-muted);
+}
+
+/* Sits under the control, because it explains the consequence of what was just typed. */
+.hint {
+  font-size: var(--tao-text-xs);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}

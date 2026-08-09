@@ -1,0 +1,39 @@
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: var(--tao-space-5);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-md);
+  background: var(--tao-surface);
+  overflow: hidden;
+}
+
+.tile {
+  flex: 1 1 160px;
+  padding: var(--tao-space-3) var(--tao-space-4);
+}
+
+.tile + .tile {
+  border-left: 1px solid var(--tao-border);
+}
+
+.label {
+  margin: 0;
+  font-size: var(--tao-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tao-text-muted);
+}
+
+.value {
+  margin: var(--tao-space-1) 0 0;
+  font-size: var(--tao-text-xl);
+  font-weight: 600;
+  color: var(--tao-text);
+}
+
+.caption {
+  margin: 2px 0 0;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}

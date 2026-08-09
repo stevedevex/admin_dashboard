@@ -1,0 +1,32 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) 1fr;
+  gap: var(--tao-space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * Request over response. The response still gets the larger share — it is the payload — but the
+ * request is no longer a bare text box: it carries a verb, a path, and the resolution trace
+ * underneath, and a row sized for one line left all three fighting for it.
+ */
+.editor {
+  display: grid;
+  grid-template-rows: minmax(220px, 38%) 1fr;
+  gap: var(--tao-space-4);
+  min-height: 0;
+}
+
+.requestHint {
+  padding: var(--tao-space-4);
+  font-size: var(--tao-text-sm);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

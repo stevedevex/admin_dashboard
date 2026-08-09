@@ -1,0 +1,15 @@
+.shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--tao-bg);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--tao-space-5) var(--tao-space-5);
+  overflow: auto;
+}

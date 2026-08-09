@@ -1,0 +1,15 @@
+.note {
+  margin: 0 0 var(--tao-space-4);
+  font-size: var(--tao-text-sm);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}
+
+.error {
+  margin: 0 0 var(--tao-space-4);
+  padding: var(--tao-space-3) var(--tao-space-4);
+  border-left: 3px solid var(--tao-error);
+  background: var(--tao-surface);
+  font-size: var(--tao-text-sm);
+  color: var(--tao-text);
+}

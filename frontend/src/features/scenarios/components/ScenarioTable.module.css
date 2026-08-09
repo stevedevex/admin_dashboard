@@ -1,0 +1,63 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tao-text-sm);
+}
+
+.table th {
+  padding: var(--tao-space-2) var(--tao-space-4);
+  text-align: left;
+  font-size: var(--tao-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tao-text-muted);
+  background: var(--tao-surface-sunken);
+  border-bottom: 1px solid var(--tao-border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--tao-space-3) var(--tao-space-4);
+  border-bottom: 1px solid var(--tao-border);
+  vertical-align: top;
+}
+
+.table tbody tr:hover {
+  background: var(--tao-surface-sunken);
+}
+
+.name {
+  display: block;
+  font-family: var(--tao-font-mono);
+  font-weight: 500;
+  color: var(--tao-text);
+}
+
+.description {
+  display: block;
+  margin-top: 2px;
+  max-width: 60ch;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  line-height: 1.4;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--tao-text-muted);
+}
+
+.serving {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The served scenario is a fact about the running sandbox, so it reads as one on the row too. */
+.rowActive td:first-child {
+  box-shadow: inset 3px 0 0 var(--tao-ok);
+}

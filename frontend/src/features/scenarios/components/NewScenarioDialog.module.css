@@ -1,0 +1,19 @@
+/* A hint that has become a reason the form will not submit. */
+.bad {
+  color: var(--tao-error);
+}
+
+/* Legal, and rarely what was meant — so it warns rather than blocks. */
+.warn {
+  color: var(--tao-warn);
+}
+
+.error {
+  margin: 0;
+  padding: var(--tao-space-3);
+  border-left: 3px solid var(--tao-error);
+  background: var(--tao-surface-sunken);
+  font-size: var(--tao-text-sm);
+  line-height: 1.5;
+  color: var(--tao-text);
+}

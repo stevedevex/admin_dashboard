@@ -1,0 +1,55 @@
+.keys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-3);
+  padding: var(--tao-space-3);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface-sunken);
+}
+
+/* Where the value is read from, so a key that is not what someone expected is visibly not it. */
+.source {
+  font-family: var(--tao-font-mono);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--tao-text-sm);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}
+
+.result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-3);
+  border-top: 1px solid var(--tao-border);
+}
+
+.resultLabel {
+  font-size: var(--tao-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tao-text-muted);
+}
+
+.fileName {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+  word-break: break-all;
+}
+
+.error {
+  font-size: var(--tao-text-xs);
+  line-height: 1.5;
+  color: var(--tao-error);
+}
+
+.muted {
+  color: var(--tao-text-muted);
+}

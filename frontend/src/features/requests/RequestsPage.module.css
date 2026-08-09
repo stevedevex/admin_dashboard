@@ -1,0 +1,31 @@
+/*
+ * List above detail, not beside it. A log line is wide — timestamp, service, operation, status,
+ * the file that answered — and the detail below it is wider still, since it holds whole payloads.
+ * Side by side would squeeze both.
+ */
+.layout {
+  display: grid;
+  grid-template-rows: minmax(180px, 40%) 1fr;
+  gap: var(--tao-space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-3);
+  padding: var(--tao-space-3) var(--tao-space-4);
+  margin-bottom: var(--tao-space-4);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius);
+  background: var(--tao-surface);
+  font-size: var(--tao-text-sm);
+  color: var(--tao-text-muted);
+}
+
+.notice code {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+}
