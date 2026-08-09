@@ -464,6 +464,60 @@ class ControlPanelWriteTest {
                 .containsExactly("incomplete");
     }
 
+    // --- the index and the explicit-reload contract --------------------------
+
+    /**
+     * The resolve path answers from memory; a file dropped onto the disk behind the store's back
+     * is served only after the explicit reload — the same contract a mounted share forces, since
+     * SMB gives no change notification.
+     */
+    @Test
+    void aFileEditedOnDiskIsServedOnlyAfterAnExplicitReload() throws IOException {
+        Path mock = ROOT.resolve("scenarios/baseline/petstore/showPetById/petid=55.json");
+        Files.createDirectories(mock.getParent());
+        Files.writeString(mock, "{ \"id\": 55, \"name\": \"Ghost\" }");
+
+        // Still answered by the operation's _default: the new file is not in the index yet.
+        assertThat(mvc.get().uri("/petstore/v1/pets/55").exchange())
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.name")
+                .asString()
+                .isNotEqualTo("Ghost");
+
+        assertThat(mvc.post().uri("/__tao/reload").exchange()).hasStatusOk();
+
+        assertThat(mvc.get().uri("/petstore/v1/pets/55").exchange())
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.name")
+                .isEqualTo("Ghost");
+    }
+
+    /**
+     * Resolution spec §7: for each candidate filename, walk the whole scenario chain before
+     * falling back to the next candidate. error-cases owns only a {@code _default} for this
+     * operation; the exact match it inherits from baseline is the better address and must win.
+     */
+    @Test
+    void anInheritedExactMatchBeatsANearerDefault() {
+        MvcTestResult result =
+                mvc.post()
+                        .uri("/__tao/resolve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "scenarioId": "error-cases", "method": "GET", "path": "/petstore/v1/pets/1" }""")
+                        .exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.matched")
+                .isEqualTo("baseline/petstore/showPetById/petid=1.json");
+        assertThat(result).bodyJson().extractingPath("$.inherited").isEqualTo(true);
+    }
+
     // --- resolve -----------------------------------------------------------
 
     @Test

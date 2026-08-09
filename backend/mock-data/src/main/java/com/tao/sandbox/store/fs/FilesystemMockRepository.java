@@ -13,13 +13,16 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,10 +32,17 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * Mocks as files on disk.
+ * Mocks as files on disk, served from memory.
  *
- * <p>Chosen first because the mock set is then git-versionable and diffable: a scenario is a
- * directory, a change is a reviewable diff, and reproducing a colleague's run is a checkout.
+ * <p>Files, because the mock set is then git-versionable and diffable: a scenario is a directory,
+ * a change is a reviewable diff, and reproducing a colleague's run is a checkout.
+ *
+ * <p>Memory, because the sandbox also serves load tests: the resolve path must do no file I/O.
+ * The whole library is read once at startup and on every explicit reload, and every request is
+ * answered from the index. Writes made through {@link #save} and {@link #delete} update the index
+ * as they land; a file edited on disk behind the store's back becomes visible on the next
+ * {@code POST /__tao/reload} — the same explicit-reload contract a mounted share forces anyway,
+ * since SMB gives no change notification.
  *
  * <pre>
  * &lt;root&gt;/scenarios/&lt;scenario&gt;/scenario.yaml
@@ -48,7 +58,18 @@ public class FilesystemMockRepository implements MockRepository {
     private static final String DEFAULT_STEM = "_default";
 
     private final Path root;
-    private final Map<String, Scenario> scenarios = new LinkedHashMap<>();
+
+    /**
+     * Both maps are replaced wholesale on {@link #reload} and mutated in place by writes, so a
+     * request racing a reload sees either the old library or the new one — never a half-built one.
+     */
+    private volatile Map<String, Scenario> scenarios = new ConcurrentHashMap<>();
+
+    /** Keyed by {@code scenario/service/operation/stem} — the address resolution actually uses. */
+    private volatile Map<String, CachedMock> mocks = new ConcurrentHashMap<>();
+
+    /** One mock held whole: payload, sidecars, and the metadata browsing shows. */
+    private record CachedMock(MockId id, MockDocument document, long sizeBytes, Instant modifiedAt) {}
 
     public FilesystemMockRepository(SandboxProperties properties) {
         this.root = Path.of(properties.filesystem().root()).toAbsolutePath().normalize();
@@ -57,42 +78,54 @@ public class FilesystemMockRepository implements MockRepository {
     @PostConstruct
     @Override
     public void reload() {
-        scenarios.clear();
-        Path scenarioRoot = root.resolve("scenarios");
+        Map<String, Scenario> loadedScenarios = new ConcurrentHashMap<>();
+        Map<String, CachedMock> loadedMocks = new ConcurrentHashMap<>();
 
+        Path scenarioRoot = root.resolve("scenarios");
         if (!Files.isDirectory(scenarioRoot)) {
             log.warn("No scenarios directory at {} — the sandbox will answer nothing", scenarioRoot);
+            this.scenarios = loadedScenarios;
+            this.mocks = loadedMocks;
             return;
         }
 
         try (Stream<Path> directories = Files.list(scenarioRoot)) {
-            directories.filter(Files::isDirectory).forEach(this::readScenario);
+            for (Path directory : directories.filter(Files::isDirectory).sorted().toList()) {
+                Scenario scenario = readScenario(directory);
+                loadedScenarios.put(scenario.id(), scenario);
+                loadMocks(directory, scenario.id(), loadedMocks);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read " + scenarioRoot, e);
         }
 
-        detectInheritanceCycles();
-        log.info("Loaded {} scenario(s) from {}", scenarios.size(), scenarioRoot);
+        detectInheritanceCycles(loadedScenarios);
+
+        this.scenarios = loadedScenarios;
+        this.mocks = loadedMocks;
+        log.info(
+                "Loaded {} scenario(s), {} mock(s) from {}",
+                loadedScenarios.size(),
+                loadedMocks.size(),
+                scenarioRoot);
     }
 
     @Override
     public Optional<Resolved> resolve(MockQuery query) {
-        for (String scenarioId : chain(query.scenarioId())) {
-            for (String fileName : fileNames(query)) {
-                Path candidate = pathFor(scenarioId, query.serviceId(), query.operationId(), fileName);
-                Optional<Path> found = firstExisting(candidate);
-
-                if (found.isPresent()) {
-                    MockId id =
-                            new MockId(
-                                    scenarioId,
-                                    query.serviceId(),
-                                    query.operationId(),
-                                    found.get().getFileName().toString());
+        // Memory only — this is the hot path, and it must stay free of file I/O.
+        //
+        // The filename is the outer dimension, matching candidates() and the resolution spec: an
+        // exact key match anywhere in the chain beats a nearer _default, because the better
+        // address wins wherever it was found. (An earlier version walked scenario-first, which
+        // let an active scenario's _default shadow an inherited exact match.)
+        for (String fileName : fileNames(query)) {
+            for (String scenarioId : chain(query.scenarioId())) {
+                CachedMock cached = mocks.get(key(scenarioId, query.serviceId(), query.operationId(), fileName));
+                if (cached != null) {
                     return Optional.of(
                             new Resolved(
-                                    id,
-                                    read(found.get()),
+                                    cached.id(),
+                                    cached.document(),
                                     scenarioId,
                                     !scenarioId.equals(query.scenarioId())));
                 }
@@ -126,40 +159,20 @@ public class FilesystemMockRepository implements MockRepository {
         Set<String> claimed = new LinkedHashSet<>();
 
         for (String current : chain(scenarioId)) {
-            Path base = root.resolve("scenarios").resolve(current);
-            if (!Files.isDirectory(base)) {
-                continue;
-            }
+            for (CachedMock cached : ownedBy(current)) {
+                MockId id = cached.id();
 
-            try (Stream<Path> files = Files.walk(base)) {
-                files.filter(Files::isRegularFile)
-                        .filter(path -> !path.getFileName().toString().equals("scenario.yaml"))
-                        .filter(path -> !Sidecars.isSidecar(path.getFileName().toString()))
-                        .forEach(
-                                path -> {
-                                    Path relative = base.relativize(path);
-                                    if (relative.getNameCount() != 3) {
-                                        return;
-                                    }
+                if (serviceId != null && !serviceId.equals(id.serviceId())) {
+                    continue;
+                }
 
-                                    String service = relative.getName(0).toString();
-                                    String operation = relative.getName(1).toString();
-                                    String file = relative.getName(2).toString();
+                // A nearer scenario overrides the same slot in an ancestor.
+                String slot = id.serviceId() + "/" + id.operationId() + "/" + id.fileName();
+                if (!claimed.add(slot)) {
+                    continue;
+                }
 
-                                    if (serviceId != null && !serviceId.equals(service)) {
-                                        return;
-                                    }
-
-                                    // A nearer scenario overrides the same slot in an ancestor.
-                                    String slot = service + "/" + operation + "/" + file;
-                                    if (!claimed.add(slot)) {
-                                        return;
-                                    }
-
-                                    summaries.add(summarise(scenarioId, current, path, service, operation, file));
-                                });
-            } catch (IOException e) {
-                throw new UncheckedIOException("Could not list " + base, e);
+                summaries.add(summarise(scenarioId, cached));
             }
         }
 
@@ -168,6 +181,14 @@ public class FilesystemMockRepository implements MockRepository {
 
     @Override
     public Optional<MockDocument> get(MockId id) {
+        CachedMock cached = mocks.get(keyFor(id));
+        if (cached != null && cached.id().fileName().equals(id.fileName())) {
+            return Optional.of(cached.document());
+        }
+
+        // Not indexed — most likely a file created on disk since the last reload. Reading it here
+        // keeps the editor honest about what exists, without putting disk I/O anywhere near
+        // resolution; serving it still requires the reload that makes the whole index agree.
         Path path = pathFor(id.scenarioId(), id.serviceId(), id.operationId(), id.fileName());
         return Files.isRegularFile(path) ? Optional.of(read(path)) : Optional.empty();
     }
@@ -186,8 +207,9 @@ public class FilesystemMockRepository implements MockRepository {
 
         Sidecars.write(path, document.envelopeHeader(), document.meta());
 
-        return summarise(
-                id.scenarioId(), id.scenarioId(), path, id.serviceId(), id.operationId(), id.fileName());
+        CachedMock cached = load(id, path);
+        mocks.put(keyFor(id), cached);
+        return summarise(id.scenarioId(), cached);
     }
 
     @Override
@@ -202,11 +224,13 @@ public class FilesystemMockRepository implements MockRepository {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not delete " + id.asPath(), e);
         }
+
+        mocks.remove(keyFor(id));
     }
 
     @Override
     public List<Scenario> scenarios() {
-        return List.copyOf(scenarios.values());
+        return scenarios.values().stream().sorted(Comparator.comparing(Scenario::id)).toList();
     }
 
     @Override
@@ -245,8 +269,9 @@ public class FilesystemMockRepository implements MockRepository {
             throw new UncheckedIOException("Could not create " + directory, e);
         }
 
-        readScenario(directory);
-        return scenarios.get(id);
+        Scenario created = readScenario(directory);
+        scenarios.put(id, created);
+        return created;
     }
 
     @Override
@@ -269,7 +294,7 @@ public class FilesystemMockRepository implements MockRepository {
         Path directory = root.resolve("scenarios").resolve(id);
         try (Stream<Path> contents = Files.walk(directory)) {
             // Deepest first, because a directory cannot be removed until it is empty.
-            for (Path path : contents.sorted(java.util.Comparator.reverseOrder()).toList()) {
+            for (Path path : contents.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }
         } catch (IOException e) {
@@ -277,6 +302,7 @@ public class FilesystemMockRepository implements MockRepository {
         }
 
         scenarios.remove(id);
+        mocks.keySet().removeIf(key -> key.startsWith(id + "/"));
     }
 
     @Override
@@ -284,7 +310,67 @@ public class FilesystemMockRepository implements MockRepository {
         return root.toString();
     }
 
-    // --- internals ---------------------------------------------------------
+    // --- the index ----------------------------------------------------------
+
+    /** Reads every mock a scenario owns into the index being built. */
+    private void loadMocks(Path scenarioDirectory, String scenarioId, Map<String, CachedMock> into) {
+        try (Stream<Path> files = Files.walk(scenarioDirectory)) {
+            // Sorted so that two files sharing a stem — legal but pointless — resolve the same
+            // way on every platform, instead of by directory-listing order.
+            for (Path path : files.filter(Files::isRegularFile).sorted().toList()) {
+                String fileName = path.getFileName().toString();
+                if (fileName.equals("scenario.yaml") || Sidecars.isSidecar(fileName)) {
+                    continue;
+                }
+
+                Path relative = scenarioDirectory.relativize(path);
+                if (relative.getNameCount() != 3) {
+                    continue;
+                }
+
+                MockId id =
+                        new MockId(
+                                scenarioId,
+                                relative.getName(0).toString(),
+                                relative.getName(1).toString(),
+                                fileName);
+                into.putIfAbsent(keyFor(id), load(id, path));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not read " + scenarioDirectory, e);
+        }
+    }
+
+    private CachedMock load(MockId id, Path path) {
+        try {
+            return new CachedMock(id, read(path), Files.size(path), Files.getLastModifiedTime(path).toInstant());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not stat " + path, e);
+        }
+    }
+
+    private List<CachedMock> ownedBy(String scenarioId) {
+        String prefix = scenarioId + "/";
+        return mocks.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(prefix))
+                .sorted(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .toList();
+    }
+
+    /**
+     * The extension is not part of the address: a service's payload format is a property of the
+     * contract, not of the request, so any file with the right stem is the mock.
+     */
+    private static String key(String scenarioId, String serviceId, String operationId, String stem) {
+        return scenarioId + "/" + serviceId + "/" + operationId + "/" + stem;
+    }
+
+    private static String keyFor(MockId id) {
+        return key(id.scenarioId(), id.serviceId(), id.operationId(), stripExtension(id.fileName()));
+    }
+
+    // --- internals ----------------------------------------------------------
 
     /**
      * Writing into a scenario that does not exist would create its directory as a side effect, and
@@ -322,33 +408,10 @@ public class FilesystemMockRepository implements MockRepository {
         return ordered;
     }
 
-    /** Filenames without extension, most specific first. */
+    /** Filename stems, most specific first. */
     private List<String> fileNames(MockQuery query) {
         String signature = query.keySignature();
         return signature.isEmpty() ? List.of(DEFAULT_STEM) : List.of(signature, DEFAULT_STEM);
-    }
-
-    /**
-     * The extension is not part of the lookup: a service's payload format is a property of the
-     * contract, not of the request, so any sibling with the right stem is the match.
-     */
-    private Optional<Path> firstExisting(Path stem) {
-        Path directory = stem.getParent();
-        String name = stem.getFileName().toString();
-
-        if (directory == null || !Files.isDirectory(directory)) {
-            return Optional.empty();
-        }
-
-        try (Stream<Path> siblings = Files.list(directory)) {
-            return siblings
-                    .filter(Files::isRegularFile)
-                    .filter(path -> !Sidecars.isSidecar(path.getFileName().toString()))
-                    .filter(path -> stripExtension(path.getFileName().toString()).equals(name))
-                    .findFirst();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not read " + directory, e);
-        }
     }
 
     private Path pathFor(String scenarioId, String serviceId, String operationId, String fileName) {
@@ -370,21 +433,17 @@ public class FilesystemMockRepository implements MockRepository {
         }
     }
 
-    private MockSummary summarise(
-            String requestedScenario, String foundIn, Path path, String service, String operation, String file) {
-        try {
-            return new MockSummary(
-                    new MockId(foundIn, service, operation, file),
-                    Files.size(path),
-                    Files.getLastModifiedTime(path).toInstant(),
-                    !foundIn.equals(requestedScenario),
-                    foundIn.equals(requestedScenario) ? null : foundIn);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not stat " + path, e);
-        }
+    private MockSummary summarise(String requestedScenario, CachedMock cached) {
+        String foundIn = cached.id().scenarioId();
+        return new MockSummary(
+                cached.id(),
+                cached.sizeBytes(),
+                cached.modifiedAt(),
+                !foundIn.equals(requestedScenario),
+                foundIn.equals(requestedScenario) ? null : foundIn);
     }
 
-    private void readScenario(Path directory) {
+    private Scenario readScenario(Path directory) {
         String id = directory.getFileName().toString();
         Path descriptor = directory.resolve("scenario.yaml");
 
@@ -406,14 +465,14 @@ public class FilesystemMockRepository implements MockRepository {
             }
         }
 
-        scenarios.put(id, new Scenario(id, name, description, parent));
+        return new Scenario(id, name, description, parent);
     }
 
     /**
      * A cycle would make {@link #chain} terminate but silently truncate, so it is rejected at load
      * time where the message can name the scenarios involved.
      */
-    private void detectInheritanceCycles() {
+    private static void detectInheritanceCycles(Map<String, Scenario> scenarios) {
         for (Scenario scenario : scenarios.values()) {
             Set<String> seen = new LinkedHashSet<>();
             String current = scenario.id();
