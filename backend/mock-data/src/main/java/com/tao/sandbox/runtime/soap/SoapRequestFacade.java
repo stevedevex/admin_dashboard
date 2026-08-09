@@ -29,7 +29,10 @@ public class SoapRequestFacade implements RequestFacade {
         this.envelope = envelope;
         this.headers = headers;
         this.version = version;
-        this.xpath = XPathFactory.newInstance().newXPath();
+        // newDefaultInstance, not newInstance: the latter runs a ServiceLoader classpath scan on
+        // every call, which is real money on the hot path. A fresh factory per request keeps
+        // thread-safety trivial — neither XPathFactory nor XPath is safe to share.
+        this.xpath = XPathFactory.newDefaultInstance().newXPath();
         this.xpath.setNamespaceContext(context(namespaces, version));
     }
 

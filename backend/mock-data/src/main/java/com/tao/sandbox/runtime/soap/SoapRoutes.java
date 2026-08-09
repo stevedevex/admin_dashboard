@@ -6,6 +6,7 @@ import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockDocument.Kind;
 import com.tao.sandbox.spec.wsdl.SoapOperationDefinition;
 import com.tao.sandbox.spec.wsdl.SoapServiceDefinition;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.namespace.QName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,9 @@ import org.w3c.dom.Document;
 public class SoapRoutes {
 
     private static final Logger log = LoggerFactory.getLogger(SoapRoutes.class);
+
+    /** {@code serviceId endpoint} → the WSDL rewritten for that endpoint. See {@link #wsdl}. */
+    private final ConcurrentHashMap<String, String> rewrittenWsdls = new ConcurrentHashMap<>();
 
     /**
      * Named distinctly from the enclosing class on purpose: a {@code @Configuration} class is
@@ -178,9 +182,19 @@ public class SoapRoutes {
      * ignored, and is genuinely hard to diagnose.
      */
     private ServerResponse wsdl(SoapServiceDefinition service, ServerRequest request) {
-        return ServerResponse.ok()
-                .header("Content-Type", "text/xml;charset=UTF-8")
-                .body(service.wsdlServedFrom(endpoint(request, service)));
+        String endpoint = endpoint(request, service);
+
+        // The rewrite string-replaces the whole document, and JAX-WS clients fetch the WSDL far
+        // more often than contracts change (which is never, without a restart). Keyed by endpoint
+        // because that echoes the caller's Host header; capped so unbounded Host values cannot
+        // grow the map — past the cap the odd caller just pays for its own rewrite.
+        String served =
+                rewrittenWsdls.size() >= 32
+                        ? service.wsdlServedFrom(endpoint)
+                        : rewrittenWsdls.computeIfAbsent(
+                                service.serviceId() + " " + endpoint, key -> service.wsdlServedFrom(endpoint));
+
+        return ServerResponse.ok().header("Content-Type", "text/xml;charset=UTF-8").body(served);
     }
 
     /** Imported schemas, so a client resolving the WSDL's imports stays inside the sandbox. */

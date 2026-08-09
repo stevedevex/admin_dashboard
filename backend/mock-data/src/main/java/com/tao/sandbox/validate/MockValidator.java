@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.namespace.QName;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
@@ -49,6 +50,16 @@ public class MockValidator {
             JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
 
     private final SpecRegistry registry;
+
+    /**
+     * Compiled once per operation, forever: the registry's schemas are fixed at startup, so there
+     * is nothing to invalidate. Without this every validate call re-parsed and re-compiled the
+     * schema — noticeable pain when the dashboard sweeps a whole library.
+     */
+    private final ConcurrentHashMap<String, CompiledSchema> compiled = new ConcurrentHashMap<>();
+
+    /** The tree is kept alongside the validator because completeness counting walks the tree. */
+    private record CompiledSchema(JsonNode node, JsonSchema schema) {}
 
     public MockValidator(SpecRegistry registry) {
         this.registry = registry;
@@ -87,23 +98,31 @@ public class MockValidator {
             return Validation.clean(Validation.Checked.SYNTAX, null);
         }
 
-        JsonNode schemaNode;
-        try {
-            schemaNode = nullableToUnion(JSON.readTree(declared.get()));
-        } catch (JsonProcessingException e) {
-            // The schema came out of a document this service parsed at startup, so this should not
-            // happen — but reporting the payload as valid because our own schema broke would be a
-            // lie in the one direction that matters.
-            return new Validation(
-                    false,
-                    Validation.Checked.NONE,
-                    null,
-                    List.of(new Validation.Issue("$", null, "Unreadable schema: " + e.getOriginalMessage(), "schema")));
+        CompiledSchema schema = compiled.get(serviceId + "/" + operationId);
+        if (schema == null) {
+            try {
+                JsonNode schemaNode = nullableToUnion(JSON.readTree(declared.get()));
+                JsonSchema jsonSchema = SCHEMAS.getSchema(schemaNode);
+                // Eager, so concurrent validate calls never race lazy validator construction.
+                jsonSchema.initializeValidators();
+                schema = new CompiledSchema(schemaNode, jsonSchema);
+                compiled.put(serviceId + "/" + operationId, schema);
+            } catch (JsonProcessingException e) {
+                // The schema came out of a document this service parsed at startup, so this should
+                // not happen — but reporting the payload as valid because our own schema broke
+                // would be a lie in the one direction that matters.
+                return new Validation(
+                        false,
+                        Validation.Checked.NONE,
+                        null,
+                        List.of(
+                                new Validation.Issue(
+                                        "$", null, "Unreadable schema: " + e.getOriginalMessage(), "schema")));
+            }
         }
 
-        JsonSchema schema = SCHEMAS.getSchema(schemaNode);
         List<Validation.Issue> issues =
-                schema.validate(instance).stream()
+                schema.schema().validate(instance).stream()
                         .sorted(Comparator.comparing(ValidationMessage::getInstanceLocation))
                         .map(
                                 message ->
@@ -118,7 +137,7 @@ public class MockValidator {
                         .toList();
 
         return new Validation(
-                issues.isEmpty(), Validation.Checked.SCHEMA, completeness(schemaNode, instance), issues);
+                issues.isEmpty(), Validation.Checked.SCHEMA, completeness(schema.node(), instance), issues);
     }
 
     private Validation validateXml(String serviceId, String operationId, String body) {
