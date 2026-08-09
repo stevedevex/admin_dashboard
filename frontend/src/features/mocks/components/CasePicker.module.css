@@ -1,0 +1,211 @@
+/*
+ * Sits in the meta strip among the tags, so it must rest at their weight. It is a control, and
+ * hover and focus are where it says so — a border drawn permanently around it would make the
+ * quietest row on the page the loudest.
+ */
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+.trigger,
+.static {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  padding: 2px var(--tao-space-2);
+  font: inherit;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--tao-radius-sm);
+}
+
+.trigger {
+  cursor: pointer;
+}
+
+.trigger:hover {
+  border-color: var(--tao-border-strong);
+  background: var(--tao-surface);
+}
+
+.trigger[aria-expanded='true'] {
+  border-color: var(--tao-border-strong);
+  background: var(--tao-surface);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--tao-accent);
+  outline-offset: 1px;
+}
+
+.label,
+.count {
+  color: var(--tao-text-muted);
+}
+
+/* Quieter than the name it follows: this is context for the control, not the file's identity. */
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The name as stored. It stays the identity of the open file — it is what gets grepped, opened in
+ * an editor and named in a resolution trace — so the decomposition sits beside it in the list
+ * rather than in place of it here.
+ */
+.name {
+  font-family: var(--tao-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 32ch;
+}
+
+/* --- The name, as fields ---------------------------------------------- */
+
+.fields {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  min-width: 0;
+}
+
+/*
+ * Key and value read as one token with two ranks, rather than as `key=value` — the separator is
+ * the only character in a mock file name that carries no information, and dropping it is what
+ * makes a four-key name scannable.
+ */
+.field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--tao-font-mono);
+  white-space: nowrap;
+}
+
+.fieldName {
+  color: var(--tao-text-muted);
+}
+
+.fieldValue {
+  color: var(--tao-text);
+}
+
+/* Not a file name: it is the answer to everything the other files do not claim. */
+.default {
+  font-style: italic;
+  color: var(--tao-text-muted);
+}
+
+.raw {
+  font-family: var(--tao-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24ch;
+}
+
+/* --- Popover ----------------------------------------------------------- */
+
+.popover {
+  position: absolute;
+  top: calc(100% + var(--tao-space-1));
+  left: 0;
+  z-index: 20;
+  min-width: 22rem;
+  max-width: min(34rem, 90vw);
+  background: var(--tao-surface);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-md);
+  box-shadow: var(--tao-shadow-md);
+}
+
+.search {
+  padding: var(--tao-space-2);
+  border-bottom: 1px solid var(--tao-border);
+}
+
+/*
+ * Bounded and scrolling. The popover floats over the editor rather than displacing it, so its
+ * height is a choice rather than a consequence — and a chooser tall enough to cover the thing it
+ * chooses for has stopped being a chooser.
+ */
+.list {
+  max-height: 17rem;
+  margin: 0;
+  padding: var(--tao-space-1);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  width: 100%;
+  padding: var(--tao-space-2);
+  font: inherit;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--tao-radius-sm);
+  cursor: pointer;
+}
+
+/* Pointer and keyboard land on the same highlight, so the two never disagree about what Enter does. */
+.option[data-active='true'] {
+  background: var(--tao-surface-sunken);
+}
+
+/*
+ * Selected and highlighted are two different facts and must look it: the marker says which file is
+ * open, the sunken background says which row Enter would take. They coincide when the popover
+ * opens and part company as soon as anybody presses a key.
+ */
+.optionSelected {
+  composes: option;
+  box-shadow: inset 3px 0 0 var(--tao-accent);
+}
+
+/*
+ * Two ranks, not two facts: the keys are what a reader is looking for, the file name is how they
+ * will refer to it afterwards. Stacked rather than side by side so the row width stays governed by
+ * the longer of the two instead of their sum.
+ */
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fileName {
+  font-family: var(--tao-font-mono);
+  color: var(--tao-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size {
+  margin-left: auto;
+  font-family: var(--tao-font-mono);
+  color: var(--tao-text-muted);
+}
+
+.empty,
+.more {
+  margin: 0;
+  padding: var(--tao-space-3);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}
+
+.more {
+  border-top: 1px solid var(--tao-border);
+}

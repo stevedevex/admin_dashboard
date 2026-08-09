@@ -5,7 +5,9 @@ import {
   type AiStatus,
   type MockContent,
   type MockSummary,
+  type Operation,
   type PayloadGeneration,
+  type Service,
   type ValidationResult,
 } from '@/api';
 import { useAsync } from '@/hooks/useAsync';
@@ -29,8 +31,8 @@ import {
   requestProbeAtom,
   selectedMockIdAtom,
 } from '../atoms';
+import { CasePicker } from './CasePicker';
 import { ContractStrip } from './ContractStrip';
-import { FileTabs } from './FileTabs';
 import { GenerateDialog } from './GenerateDialog';
 import { IssueList } from './IssueList';
 import { MockStateTag } from './MockStateTag';
@@ -49,12 +51,37 @@ import styles from './MockPayloadPanel.module.css';
  */
 export type MockPayloadPanelProps = {
   mockId: string | null;
-  /** Every file of the operation the open one belongs to, for the tab strip. */
+  /** Every file of the operation the open one belongs to, for the choosers. */
   siblings: MockSummary[];
   onSelect: (mockId: string) => void;
 };
 
 export function MockPayloadPanel({ mockId, siblings, onSelect }: MockPayloadPanelProps) {
+  /*
+   * Both of these are fetched *here*, outside the keyed subtree below, because neither describes
+   * the open file and neither should be re-fetched when it changes.
+   *
+   * The contract belongs to the operation, so it is re-read only when the service does — switching
+   * between files of one operation asks for nothing. The capability is a property of the running
+   * sandbox, so it is asked once for the life of the page, which is what its own note always
+   * claimed and could not deliver from inside a component that remounts on every selection.
+   */
+  const { serviceId, operationId } = coordinatesOf(mockId ?? '');
+
+  const catalog = useAsync<Service | null>(
+    () => (serviceId === '' ? Promise.resolve(null) : api.getService(serviceId)),
+    [serviceId],
+  );
+  const operation =
+    catalog.status === 'ready'
+      ? (catalog.data?.operations.find((candidate) => candidate.id === operationId) ?? null)
+      : null;
+
+  // Asked once, and never retried on failure: a sandbox with no AI module answers 404 here, which
+  // is a normal deployment rather than an error worth reporting on a page about mock files. Null
+  // covers both "not asked yet" and "no such module", and both mean the same thing on screen.
+  const ai = useAsync<AiStatus | null>(() => api.getAiStatus().catch(() => null), []);
+
   return (
     <Panel title="Mock payload" flush footer={null}>
       {mockId ? (
@@ -62,7 +89,14 @@ export function MockPayloadPanel({ mockId, siblings, onSelect }: MockPayloadPane
         // a specific payload — a verdict, a save error, where the text came from — and carrying any
         // of it to the next file would vouch for bytes nobody checked. Drafts survive regardless:
         // they live in an atom precisely so switching away does not discard unsaved work.
-        <Loaded key={mockId} mockId={mockId} siblings={siblings} onSelect={onSelect} />
+        <Loaded
+          key={mockId}
+          mockId={mockId}
+          siblings={siblings}
+          onSelect={onSelect}
+          operation={operation}
+          ai={ai.status === 'ready' ? ai.data : null}
+        />
       ) : (
         <EmptyState title="No file selected">
           Pick a file on the left, or try a request above and open the file it resolves to.
@@ -76,7 +110,12 @@ function Loaded({
   mockId,
   siblings,
   onSelect,
-}: { mockId: string } & Omit<MockPayloadPanelProps, 'mockId'>) {
+  operation,
+  ai,
+}: { mockId: string; operation: Operation | null; ai: AiStatus | null } & Omit<
+  MockPayloadPanelProps,
+  'mockId'
+>) {
   const nonce = useAtomValue(reloadNonceAtom);
   const storeNonce = useAtomValue(storeNonceAtom);
   const bumpReload = useSetAtom(reloadNonceAtom);
@@ -97,9 +136,15 @@ function Loaded({
 
   const state = useAsync<MockContent | null>(() => api.getMock(mockId), [mockId, nonce, storeNonce]);
 
-  // Asked once, and never retried on failure: a sandbox with no AI module answers 404 here, which
-  // is a normal deployment rather than an error worth reporting on a page about mock files.
-  const ai = useAsync<AiStatus | null>(() => api.getAiStatus().catch(() => null), []);
+  /*
+   * Coordinates come from the id, which is `scenario/service/operation/file` by construction and
+   * is the only thing available for a file that does not exist yet — exactly the case where
+   * generating a payload is most useful, so it must work without a stored record.
+   */
+  const { serviceId, operationId } = coordinatesOf(mockId);
+
+  // The contract's key list, for rendering a file name as the key values it was built from.
+  const keys = operation?.keys ?? [];
 
   // Results describe a specific payload, so they must not outlive an edit —
   // a stale green tick beside changed text is worse than no result at all.
@@ -122,11 +167,6 @@ function Loaded({
   const mock = state.data;
   const value = draft ?? mock?.body ?? '';
   const dirty = unwritten || (draft !== undefined && draft !== mock?.body);
-
-  // From the record when there is one, from the id when the file does not exist yet — which is
-  // exactly the case where generating is most useful, so it must work without one.
-  const serviceId = mock?.serviceId ?? coordinatesOf(mockId).serviceId;
-  const operationId = mock?.operationId ?? coordinatesOf(mockId).operationId;
 
   const setDraft = (next: string) => {
     setDrafts({ ...drafts, [mockId]: next });
@@ -216,7 +256,18 @@ function Loaded({
   return (
     <div className={styles.wrap}>
       <div className={styles.meta}>
-        <MetaTag label="File" value={mock?.fileName ?? fileNameOf(mockId)} />
+        {/*
+          The file's identity and the way to change it are one control. It reads as the label it
+          replaced until it is hovered, which is the point: switching file is frequent and should
+          cost nothing, so it takes the line the name was already spending.
+        */}
+        <CasePicker
+          files={siblings}
+          selectedId={mockId}
+          fileName={mock?.fileName ?? fileNameOf(mockId)}
+          keys={keys}
+          onSelect={onSelect}
+        />
         {mock ? (
           <>
             <MetaTag label="Size" value={formatBytes(mock.sizeBytes)} />
@@ -287,10 +338,9 @@ function Loaded({
       <ContractStrip
         serviceId={serviceId}
         operationId={operationId}
+        operation={operation}
         effective={mock?.effective ?? null}
       />
-
-      <FileTabs files={siblings} selectedId={mockId} onSelect={onSelect} />
 
       <div className={styles.editor}>
         <CodeEditor
@@ -310,12 +360,12 @@ function Loaded({
           missing here is usually whoever can configure it.
         */}
         <div className={styles.assist}>
-          {ai.status === 'ready' && ai.data && (
-            <span title={ai.data.reason ?? undefined}>
+          {ai && (
+            <span title={ai.reason ?? undefined}>
               <Button
                 emphasis="secondary"
                 onClick={() => setGenerating(true)}
-                disabled={saving || !ai.data.available}
+                disabled={saving || !ai.available}
                 icon={<Icon name="ai" size={14} />}
               >
                 AI Assist
@@ -382,11 +432,11 @@ function Loaded({
         </Dialog>
       )}
 
-      {generating && ai.status === 'ready' && ai.data && (
+      {generating && ai && (
         <GenerateDialog
           serviceId={serviceId}
           operationId={operationId}
-          status={ai.data}
+          status={ai}
           current={value}
           onClose={() => setGenerating(false)}
           onGenerated={accept}

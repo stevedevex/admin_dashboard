@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, type MockContent, type OperationSchema, type Service } from '@/api';
+import { api, type MockContent, type Operation, type OperationSchema } from '@/api';
 import { useAsync } from '@/hooks/useAsync';
 import { Button, CodeEditor, Dialog, Icon, Tag } from '@/ui';
 import styles from './ContractStrip.module.css';
@@ -7,6 +7,14 @@ import styles from './ContractStrip.module.css';
 export type ContractStripProps = {
   serviceId: string;
   operationId: string;
+  /**
+   * The contract for this operation, or null while it loads.
+   *
+   * Passed in rather than fetched here, now that the file choosers need the same key list to
+   * decompose file names by: three components asking for one service would be three requests for
+   * one answer, and the one that arrived last would decide what a name looked like.
+   */
+  operation: Operation | null;
   /** Present once the file is stored; absent for a draft that has never been saved. */
   effective: MockContent['effective'] | null;
 };
@@ -25,14 +33,13 @@ export type ContractStripProps = {
  * The schema itself opens on demand rather than inline — it can run to hundreds of lines, and
  * this sits above an editor whose whole purpose is vertical room.
  */
-export function ContractStrip({ serviceId, operationId, effective }: ContractStripProps) {
+export function ContractStrip({
+  serviceId,
+  operationId,
+  operation,
+  effective,
+}: ContractStripProps) {
   const [showing, setShowing] = useState(false);
-
-  const catalog = useAsync<Service | null>(() => api.getService(serviceId), [serviceId]);
-  const operation =
-    catalog.status === 'ready'
-      ? (catalog.data?.operations.find((candidate) => candidate.id === operationId) ?? null)
-      : null;
 
   // Fetched only once asked for, so the common case of never opening it costs nothing.
   const schema = useAsync<OperationSchema | null>(

@@ -49,11 +49,11 @@ export function MocksPage() {
   );
 
   /**
-   * The files of whichever operation is open, for the tab strip beside the payload.
+   * The files of whichever operation is open, for the choosers beside the payload.
    *
    * Read from the unfiltered tree on purpose: a filter narrows what is being *browsed*, and
    * hiding an operation's other files because the query happened to name only one of them would
-   * make the tabs disagree with the file that is open.
+   * make the choosers disagree with the file that is open.
    */
   const siblings = useMemo(() => {
     if (tree.status !== 'ready' || !selectedId) return [];
