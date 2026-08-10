@@ -184,6 +184,7 @@ class RequestLogController {
     record Summary(
             String id,
             Instant at,
+            RequestLog.Source source,
             String serviceId,
             String operationId,
             String scenarioId,
@@ -196,6 +197,7 @@ class RequestLogController {
             return new Summary(
                     String.valueOf(entry.id()),
                     entry.at(),
+                    entry.source(),
                     entry.serviceId(),
                     entry.operationId(),
                     entry.scenarioId(),

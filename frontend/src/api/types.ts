@@ -253,6 +253,58 @@ export type ResolveRequest = {
   method?: string;
   path?: string;
   body?: string;
+  /** Sent as given, minus the few the HTTP client owns. Only meaningful when actually sending. */
+  headers?: Record<string, string>;
+  /** Overrides what the protocol would otherwise imply. */
+  contentType?: string;
+};
+
+/**
+ * What a client would actually have received.
+ *
+ * The response verbatim, not a description of one — which is the whole difference from
+ * {@link ResolutionTrace}. A mock file holds a payload; what leaves the server is that payload
+ * wrapped in an envelope, given a status a sidecar or the contract chose, carrying headers written
+ * in neither place.
+ *
+ * `requestId` names the log entry this call was recorded under, so the trace is one fetch away
+ * rather than duplicated here. `discarded` is the exception: the serving path never enumerates a
+ * request's fields, so the log cannot carry that one and the server computes it alongside.
+ *
+ * `tookMillis` is the round trip including the sandbox's own loopback hop — not the resolution
+ * time, which the log entry holds.
+ */
+export type PlaygroundResult = {
+  serviceId: string;
+  operationId: string;
+  scenarioId: string;
+  /** What was called, so the loopback is visible rather than implied. */
+  url: string;
+  status: number;
+  /** Names arrive lower-cased: that is how they come off the wire, and inventing casing would lie. */
+  headers: Record<string, string>;
+  body: string;
+  tookMillis: number;
+  requestId: string | null;
+  discarded: string[];
+};
+
+/**
+ * A request composed from the contract, ready to send or edit.
+ *
+ * Values are written at the locations each key's own declaration reads from, so a draft made from a
+ * mock's keys resolves to that mock by construction rather than by looking plausible.
+ *
+ * `method` is null for SOAP, where the contract fixes both the verb and the endpoint. `note` says
+ * what could not be filled in — a request that falls through to an operation's default otherwise
+ * reads as a miss.
+ */
+export type PlaygroundDraft = {
+  method: string | null;
+  path: string;
+  body: string | null;
+  contentType: string | null;
+  note: string | null;
 };
 
 /**
@@ -289,6 +341,15 @@ export type ResolutionTrace = {
 export type RequestEntry = {
   id: string;
   at: string;
+  /**
+   * Whether the application under test made this call, or somebody made it by hand in the
+   * playground.
+   *
+   * Labelled rather than filtered out at the source. Dropping hand-made calls would leave the log
+   * disagreeing with what the server demonstrably served; mixing them in unlabelled would have the
+   * log answer "did my application send that?" wrongly, which is the one question it exists for.
+   */
+  source: 'client' | 'playground';
   serviceId: string | null;
   operationId: string | null;
   scenarioId: string | null;

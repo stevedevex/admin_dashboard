@@ -14,6 +14,7 @@ import {
   Clock,
   FileCode2,
   FileText,
+  FlaskConical,
   FolderClosed,
   HelpCircle,
   Layers,
@@ -23,6 +24,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Send,
   Server,
   XCircle,
 } from 'lucide-react';
@@ -43,6 +45,7 @@ const registry = {
   mocks: FileCode2,
   scenarios: Layers,
   requests: ArrowLeftRight,
+  playground: FlaskConical,
   planned: Clock,
 
   // Shell
@@ -62,6 +65,9 @@ const registry = {
   save: Save,
   delete: Trash2,
   validate: Check,
+  /* Distinct from `validate`: this one actually puts a request on the wire, and a tick would
+     promise a verdict where the answer is whatever the server says. */
+  send: Send,
 
   // Tree
   expanded: ChevronDown,

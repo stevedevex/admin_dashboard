@@ -1,5 +1,6 @@
 import type { RequestEntry } from '@/api';
 import { formatClockTime } from '@/lib/format';
+import { fileOf } from '@/lib/mockPath';
 import { Icon, Tag } from '@/ui';
 import styles from './RequestTable.module.css';
 
@@ -16,6 +17,7 @@ export function RequestTable({ entries, selectedId, onSelect }: RequestTableProp
         <thead>
           <tr>
             <th className={styles.time}>Time</th>
+            <th className={styles.source}>From</th>
             <th className={styles.service}>Service</th>
             <th className={styles.operation}>Operation</th>
             <th className={`${styles.status} ${styles.numeric}`}>Status</th>
@@ -32,6 +34,17 @@ export function RequestTable({ entries, selectedId, onSelect }: RequestTableProp
             >
               <td className={`${styles.time} ${styles.mono}`}>
                 {formatClockTime(entry.at, { millis: true })}
+              </td>
+              {/* The application under test is the expected case and stays quiet; a call somebody
+                  made by hand is the one that would otherwise be misread as traffic. */}
+              <td className={styles.source}>
+                {entry.source === 'playground' ? (
+                  <Tag tone="info" icon={<Icon name="playground" size={11} />}>
+                    playground
+                  </Tag>
+                ) : (
+                  <span className={styles.muted}>app</span>
+                )}
               </td>
               <td className={styles.service}>{entry.serviceId ?? '—'}</td>
               <td className={`${styles.operation} ${styles.mono}`}>{entry.operationId ?? '—'}</td>
@@ -65,14 +78,4 @@ export function RequestTable({ entries, selectedId, onSelect }: RequestTableProp
       </table>
     </div>
   );
-}
-
-/**
- * The file name alone, with the full path on hover.
- *
- * A matched id is `scenario/service/operation/file`, and the first three are already columns on
- * this row — repeating them would push the part that differs off the edge.
- */
-function fileOf(matched: string): string {
-  return matched.split('/').pop() ?? matched;
 }

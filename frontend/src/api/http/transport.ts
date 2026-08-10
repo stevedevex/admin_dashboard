@@ -14,6 +14,8 @@ import type {
   Operation,
   OperationSchema,
   PayloadGeneration,
+  PlaygroundDraft,
+  PlaygroundResult,
   RequestPage,
   ResolutionTrace,
   ResolveRequest,
@@ -115,6 +117,8 @@ type WireMockDetail = {
 type WireRequestEntry = {
   id: string | number;
   at: string;
+  /** `CLIENT` or `PLAYGROUND`, in the server's spelling. */
+  source: string;
   serviceId: string | null;
   operationId: string | null;
   scenarioId: string | null;
@@ -253,7 +257,12 @@ function toValidation(wire: WireValidation): ValidationResult {
 
 /** The list types an entry id as a string, the detail as a number. Both are the same cursor. */
 function toRequestEntry(wire: WireRequestEntry): RequestEntry {
-  return { ...wire, id: String(wire.id) };
+  return { ...wire, id: String(wire.id), source: toSource(wire.source) };
+}
+
+/** Anything unrecognised reads as a client, the same default the server applies to the header. */
+function toSource(wire: string): 'client' | 'playground' {
+  return wire?.toLowerCase() === 'playground' ? 'playground' : 'client';
 }
 
 /** `scenario/service/operation/file` — the id is the address, and it is parseable. */
@@ -451,6 +460,28 @@ export const httpTransport: Transport = {
     return request<ResolutionTrace>('/resolve', { method: 'POST', body: probe });
   },
 
+  /**
+   * Sends the request for real and returns what came back.
+   *
+   * The same input shape as `resolve`, deliberately: the two answer neighbouring questions about
+   * one request, so handing a probe over to the playground is a pass-through rather than a
+   * translation.
+   */
+  async sendToPlayground(attempt: ResolveRequest): Promise<PlaygroundResult> {
+    return request<PlaygroundResult>('/playground', { method: 'POST', body: attempt });
+  },
+
+  async draftRequest(
+    serviceId: string,
+    operationId: string,
+    keys: Record<string, string> = {},
+  ): Promise<PlaygroundDraft> {
+    return request<PlaygroundDraft>('/playground/draft', {
+      method: 'POST',
+      body: { serviceId, operationId, keys },
+    });
+  },
+
   async reloadStore(): Promise<void> {
     await request<unknown>('/reload', { method: 'POST' });
   },
@@ -492,7 +523,7 @@ export const httpTransport: Transport = {
   async getRequest(id: string): Promise<RequestDetail | null> {
     try {
       const wire = await request<WireRequestDetail>(`/requests/${encodeURIComponent(id)}`);
-      return { ...wire, id: String(wire.id) };
+      return { ...wire, id: String(wire.id), source: toSource(wire.source) };
     } catch (cause) {
       // A bounded log evicts: an entry that has aged out is a normal answer, not a failure.
       if (cause instanceof ApiError && cause.status === 404) return null;

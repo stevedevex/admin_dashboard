@@ -58,6 +58,16 @@ public class ControlPanelProblem extends RuntimeException {
         return new ControlPanelProblem(HttpStatus.PRECONDITION_REQUIRED, type, title, detail);
     }
 
+    /**
+     * The request was fine, but a call this endpoint had to make on the caller's behalf did not
+     * come back. Only the playground can reach this: it is the one endpoint that answers by calling
+     * the sandbox's own data plane, so it is the one that can fail for a reason the caller did
+     * nothing to cause.
+     */
+    public static ControlPanelProblem badGateway(String type, String title, String detail) {
+        return new ControlPanelProblem(HttpStatus.BAD_GATEWAY, type, title, detail);
+    }
+
     public ProblemDetail asProblemDetail() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, getMessage());
         problem.setType(URI.create("urn:tao:sandbox:" + type));

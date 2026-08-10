@@ -84,6 +84,7 @@ export const navigation: NavGroup[] = [
       { id: 'mocks', label: 'Mocks', path: '/mock-data/mocks', icon: 'mocks' },
       { id: 'scenarios', label: 'Scenarios', path: '/mock-data/scenarios', icon: 'scenarios' },
       { id: 'requests', label: 'Requests', path: '/mock-data/requests', icon: 'requests' },
+      { id: 'playground', label: 'Playground', path: '/mock-data/playground', icon: 'playground' },
     ],
   },
   {

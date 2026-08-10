@@ -1,0 +1,98 @@
+/*
+ * Collapsed by default, and summarising itself while closed. The one fact most readers want from
+ * the trace — which file answered — is on the summary line, so opening it is for the times that
+ * answer is the surprising part.
+ */
+.root {
+  border-top: 1px solid var(--tao-border);
+  background: var(--tao-surface-sunken);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-2) var(--tao-space-3);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--tao-focus-ring);
+  outline-offset: -2px;
+}
+
+.matched {
+  font-family: var(--tao-font-mono);
+  color: var(--tao-text);
+}
+
+.detail {
+  padding: 0 var(--tao-space-3) var(--tao-space-3);
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tao-space-2);
+  margin-bottom: var(--tao-space-1);
+}
+
+.label {
+  font-size: var(--tao-label-size);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
+  color: var(--tao-text-muted);
+}
+
+.mono {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+}
+
+.muted {
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}
+
+.attempts {
+  margin: 0 0 var(--tao-space-2);
+  padding: 0;
+  list-style: none;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.attempt {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-1);
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}
+
+/* The one that won, marked so the list reads as an outcome rather than a list of paths. */
+.attemptHit {
+  composes: attempt;
+  color: var(--tao-ok);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--tao-focus-ring);
+  outline-offset: 2px;
+}

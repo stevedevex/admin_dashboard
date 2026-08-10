@@ -106,7 +106,18 @@ public record SoapSchemas(
      *     operation whose response element the schema does not define
      */
     public Optional<String> skeleton(String operationId) {
-        QName element = responseElements.get(operationId);
+        return skeletonFor(responseElements.get(operationId));
+    }
+
+    /**
+     * The same skeleton for any element the schema declares, not only a response.
+     *
+     * <p>Exists because the playground needs the other direction: a request envelope is the one
+     * thing nobody wants to hand-write, and the element it must contain is already known — it is
+     * what the router matches a body against. Building it from the same walk means a drafted request
+     * and a drafted response cannot disagree about how the contract nests things.
+     */
+    public Optional<String> skeletonFor(QName element) {
         if (element == null) {
             return Optional.empty();
         }

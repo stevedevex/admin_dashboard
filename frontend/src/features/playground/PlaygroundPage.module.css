@@ -1,0 +1,109 @@
+/*
+ * Side by side, unlike the mocks page. These two are one exchange and roughly the same shape — an
+ * envelope in, an envelope out — and comparing them is the activity.
+ *
+ * Weighted 40/60 rather than split evenly. They are not the same size of thing in practice: a
+ * request is a short envelope or a path, and a response is a full payload with headers and a trace
+ * under it. Equal columns spent room on whitespace beside the request to make the response scroll.
+ */
+.layout {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: var(--tao-space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * Without this the 40/60 above is only a request. A grid track sized in `fr` will not shrink below
+ * its content's min-content width, and both panels hold code editors whose longest unbroken line
+ * sets that — so the split silently drifted back towards even, decided by whichever payload
+ * happened to be on screen. The editors scroll inside themselves, so nothing is lost by letting the
+ * columns be the size they were asked to be.
+ */
+.layout > * {
+  min-width: 0;
+}
+
+/*
+ * Below the point where two columns of XML are each too narrow to read, one above the other beats
+ * two unreadable ones.
+ */
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
+
+.request,
+.response {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-2) var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+}
+
+.method {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}
+
+/* Takes the room the verb and the button leave: the path is the long part. */
+.path {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tao-space-2);
+  margin: 0;
+  padding: var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+  font-size: var(--tao-text-xs);
+  line-height: 1.6;
+  color: var(--tao-text-muted);
+}
+
+/* Everything the fixed rows above leave. The payload is the work surface on both sides. */
+.editor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tao-space-2);
+  padding: var(--tao-space-4);
+}
+
+.error p {
+  margin: 0;
+  font-size: var(--tao-text-sm);
+  color: var(--tao-error);
+}

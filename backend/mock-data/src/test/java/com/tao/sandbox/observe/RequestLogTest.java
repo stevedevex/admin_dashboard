@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 import com.tao.sandbox.config.SandboxProperties;
 import com.tao.sandbox.config.SandboxProperties.StoreType;
+import com.tao.sandbox.observe.RequestLog.Source;
 import com.tao.sandbox.runtime.resolve.ResolutionTrace;
 import com.tao.sandbox.store.MockId;
 import java.time.Duration;
@@ -25,7 +26,7 @@ class RequestLogTest {
     @Test
     void recordsWhatResolutionConcluded() {
         RequestLog log = log(10, 1000);
-        log.record(hit(), 200, "the request", "the response");
+        log.record(hit(), 200, "the request", "the response", Source.CLIENT);
 
         RequestLog.Entry entry = log.since(null, 10).entries().getFirst();
 
@@ -42,7 +43,7 @@ class RequestLogTest {
     @Test
     void recordsAMissWithNothingMatched() {
         RequestLog log = log(10, 1000);
-        log.record(miss(), 404, "the request", null);
+        log.record(miss(), 404, "the request", null, Source.CLIENT);
 
         RequestLog.Entry entry = log.since(null, 10).entries().getFirst();
 
@@ -57,7 +58,7 @@ class RequestLogTest {
     @Test
     void recordsARequestRejectedBeforeItReachedAnOperation() {
         RequestLog log = log(10, 1000);
-        log.recordRejected("svc", "Malformed SOAP request", 400, "<not-an-envelope/>");
+        log.recordRejected("svc", "Malformed SOAP request", 400, "<not-an-envelope/>", Source.CLIENT);
 
         RequestLog.Entry entry = log.since(null, 10).entries().getFirst();
 
@@ -130,7 +131,7 @@ class RequestLogTest {
     @Test
     void truncatesLongBodiesAndSaysThatItDid() {
         RequestLog log = log(10, 5);
-        log.record(hit(), 200, "0123456789", "short");
+        log.record(hit(), 200, "0123456789", "short", Source.CLIENT);
 
         RequestLog.Entry entry = log.since(null, 10).entries().getFirst();
 
@@ -170,7 +171,7 @@ class RequestLogTest {
 
     private static void record(RequestLog log, int count) {
         for (int i = 0; i < count; i++) {
-            log.record(hit(), 200, "request " + i, "response " + i);
+            log.record(hit(), 200, "request " + i, "response " + i, Source.CLIENT);
         }
     }
 

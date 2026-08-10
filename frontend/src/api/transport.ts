@@ -7,6 +7,8 @@ import type {
   MockSummary,
   OperationSchema,
   PayloadGeneration,
+  PlaygroundDraft,
+  PlaygroundResult,
   RequestDetail,
   RequestPage,
   ResolutionTrace,
@@ -181,4 +183,29 @@ export type Transport = {
    * would be using it to find out why a request did not match.
    */
   resolve(request: ResolveRequest): Promise<ResolutionTrace>;
+
+  /**
+   * Send the request for real, and return what a client would have received.
+   *
+   * The neighbouring question to {@link resolve}, and a different one. That answers which file
+   * would answer and why; this answers what actually comes off the wire — the envelope the server
+   * wrapped, the status a sidecar chose, the headers written in neither the mock nor the dashboard.
+   *
+   * The call genuinely happens: it is recorded in the request log, labelled as coming from the
+   * playground, and the result names that entry so the trace can be read from it.
+   */
+  sendToPlayground(request: ResolveRequest): Promise<PlaygroundResult>;
+
+  /**
+   * A request to start from, composed from the operation's contract.
+   *
+   * A read; nothing is sent. `keys` are written at the locations each key's own declaration reads
+   * from, so a draft made from an existing mock's keys resolves to that mock rather than merely
+   * resembling something that would.
+   */
+  draftRequest(
+    serviceId: string,
+    operationId: string,
+    keys?: Record<string, string>,
+  ): Promise<PlaygroundDraft>;
 };

@@ -8,12 +8,13 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.SequencedMap;
 import org.springframework.stereotype.Component;
 
 /**
- * What the application under test actually called.
+ * What was actually served, and to whom.
  *
  * <p>Bounded, in memory, dropped on restart. Persisting it would make the sandbox a system with
  * state worth backing up, which is the opposite of what it is for.
@@ -26,6 +27,47 @@ import org.springframework.stereotype.Component;
 public class RequestLog {
 
     /**
+     * Who made the call, declared by the caller in this header.
+     *
+     * <p>Not configurable, unlike the scenario override: this is an internal agreement between the
+     * playground and the log, not something a deployment has reason to rename.
+     */
+    public static final String SOURCE_HEADER = "X-Sandbox-Source";
+
+    /**
+     * The id of the entry a response was logged under, echoed on every served response.
+     *
+     * <p>Server truth about a call rather than part of what a mock describes, so it is set after a
+     * mock's own headers and cannot be overridden by one.
+     */
+    public static final String REQUEST_ID_HEADER = "X-Sandbox-Request-Id";
+
+    /**
+     * Whether a call came from the application under test or from someone trying one by hand.
+     *
+     * <p>Recorded rather than filtered out, because the alternatives are both worse. Dropping
+     * hand-made calls would leave the log disagreeing with what the server demonstrably served, and
+     * mixing them in unlabelled would have the log answer "did my application send that?" wrongly —
+     * which is the one question it exists to answer.
+     */
+    public enum Source {
+        CLIENT,
+        PLAYGROUND;
+
+        /** Anything unrecognised is a client: the header is a claim, and the default is the truth. */
+        public static Source of(String header) {
+            if (header == null) {
+                return CLIENT;
+            }
+            try {
+                return valueOf(header.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return CLIENT;
+            }
+        }
+    }
+
+    /**
      * @param id monotonic and never reused, so it works as a cursor
      * @param matched the mock that answered, or null on a miss — the misses are what the log is
      *     usually opened for
@@ -35,6 +77,7 @@ public class RequestLog {
     public record Entry(
             long id,
             Instant at,
+            Source source,
             String serviceId,
             String operationId,
             String scenarioId,
@@ -68,17 +111,24 @@ public class RequestLog {
         this.maxBodyChars = Math.max(0, properties.requestLog().maxBodyChars());
     }
 
-    /** One resolved request, hit or miss. */
-    public synchronized void record(
-            ResolutionTrace trace, int status, String requestBody, String responseBody) {
+    /**
+     * One resolved request, hit or miss.
+     *
+     * @return the id of the entry just written, so the caller can name it in a response header. A
+     *     client holding the id of its own call can ask what the server decided without hunting for
+     *     it in a log that other traffic is also arriving in.
+     */
+    public synchronized long record(
+            ResolutionTrace trace, int status, String requestBody, String responseBody, Source source) {
 
         String request = truncate(requestBody);
         String response = truncate(responseBody);
 
-        append(
+        return append(
                 new Entry(
                         nextId,
                         Instant.now(),
+                        source,
                         trace.serviceId(),
                         trace.operationId(),
                         trace.scenarioId(),
@@ -101,15 +151,16 @@ public class RequestLog {
      * empty log otherwise, which reads as "my requests are not arriving" and sends whoever is
      * debugging it to the network layer.
      */
-    public synchronized void recordRejected(
-            String serviceId, String reason, int status, String requestBody) {
+    public synchronized long recordRejected(
+            String serviceId, String reason, int status, String requestBody, Source source) {
 
         String request = truncate(requestBody);
 
-        append(
+        return append(
                 new Entry(
                         nextId,
                         Instant.now(),
+                        source,
                         serviceId,
                         null,
                         null,
@@ -157,7 +208,7 @@ public class RequestLog {
 
     // --- internals ---------------------------------------------------------
 
-    private void append(Entry entry) {
+    private long append(Entry entry) {
         entries.addLast(entry);
         nextId++;
 
@@ -165,6 +216,8 @@ public class RequestLog {
             Entry evicted = entries.removeFirst();
             oldestRetained = evicted.id() + 1;
         }
+
+        return entry.id();
     }
 
     private String truncate(String body) {

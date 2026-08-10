@@ -1,0 +1,22 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+}
+
+.label {
+  font-size: var(--tao-label-size);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
+  color: var(--tao-text-muted);
+}
+
+.select {
+  font: inherit;
+  font-size: var(--tao-text-sm);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}

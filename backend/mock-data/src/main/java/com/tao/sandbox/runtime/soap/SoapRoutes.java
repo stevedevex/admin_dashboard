@@ -70,6 +70,9 @@ public class SoapRoutes {
     private ServerResponse handle(
             SoapServiceDefinition service, ServerRequest request, MockPipeline pipeline, RequestLog requests) {
 
+        RequestLog.Source source =
+                RequestLog.Source.of(request.headers().firstHeader(RequestLog.SOURCE_HEADER));
+
         Document envelope;
         SoapVersion version;
         QName bodyElement;
@@ -90,10 +93,10 @@ public class SoapRoutes {
             // The version is unknown at this point, so answer in 1.1 — the older client is the one
             // more likely to be unable to read the newer format.
             String reason = "Malformed SOAP request: " + e.getMessage();
-            requests.recordRejected(service.serviceId(), reason, SoapVersion.SOAP_1_1.httpStatusFor(
-                    SoapVersion.SOAP_1_1.senderCode()), null);
+            long logged = requests.recordRejected(service.serviceId(), reason, SoapVersion.SOAP_1_1.httpStatusFor(
+                    SoapVersion.SOAP_1_1.senderCode()), null, source);
             return fault(SoapVersion.SOAP_1_1, SoapVersion.SOAP_1_1.senderCode(),
-                    "Malformed SOAP request", String.valueOf(e.getMessage()));
+                    "Malformed SOAP request", String.valueOf(e.getMessage()), logged);
         }
 
         SoapOperationDefinition operation;
@@ -102,23 +105,25 @@ public class SoapRoutes {
 
             case OperationLocator.SoapMatch.Unknown ignored -> {
                 String reason = "Unknown operation for body element " + bodyElement;
-                requests.recordRejected(
-                        service.serviceId(), reason, version.httpStatusFor(version.senderCode()), raw);
+                long logged = requests.recordRejected(
+                        service.serviceId(), reason, version.httpStatusFor(version.senderCode()), raw, source);
                 return fault(version, version.senderCode(), reason,
-                        "Known elements: " + service.elementToOperation().keySet());
+                        "Known elements: " + service.elementToOperation().keySet(), logged);
             }
 
             // Present in the contract, absent from configuration. Saying so plainly is far more
             // useful than an empty response that looks like a data problem.
             case OperationLocator.SoapMatch.NotConfigured notConfigured -> {
                 String name = notConfigured.operationName();
-                requests.recordRejected(
+                long logged = requests.recordRejected(
                         service.serviceId(),
                         "NOT_IMPLEMENTED: '%s' is in the contract but not configured".formatted(name),
                         501,
-                        raw);
+                        raw,
+                        source);
                 return ServerResponse.status(501)
                         .header("Content-Type", version.contentType())
+                        .header(RequestLog.REQUEST_ID_HEADER, String.valueOf(logged))
                         .body(
                                 SoapEnvelope.fault(
                                         version,
@@ -136,10 +141,10 @@ public class SoapRoutes {
                                 envelope, request.headers().asHttpHeaders(), service.namespaces(), version));
 
         if (outcome.document().isEmpty()) {
-            requests.record(
-                    outcome.trace(), version.httpStatusFor(version.receiverCode()), raw, null);
+            long logged = requests.record(
+                    outcome.trace(), version.httpStatusFor(version.receiverCode()), raw, null, source);
             return fault(version, version.receiverCode(),
-                    "No mock matched this request", outcome.trace().explain());
+                    "No mock matched this request", outcome.trace().explain(), logged);
         }
 
         var document = outcome.document().get();
@@ -160,18 +165,24 @@ public class SoapRoutes {
         int status = meta.statusOr(version.defaultStatusFor(meta.kindOr(Kind.RESPONSE)));
 
         // The wrapped envelope, not the stored payload: the log should show what left the server.
-        requests.record(outcome.trace(), status, raw, body);
+        long logged = requests.record(outcome.trace(), status, raw, body, source);
 
         var response =
                 ServerResponse.status(status)
                         .header("Content-Type", meta.contentTypeOr(version.contentType()));
         meta.headers().forEach(response::header);
+
+        // After the mock's own headers: the id is what the server did with this call, not something
+        // a stored response gets to describe.
+        response.header(RequestLog.REQUEST_ID_HEADER, String.valueOf(logged));
         return response.body(body);
     }
 
-    private ServerResponse fault(SoapVersion version, String code, String message, String detail) {
+    private ServerResponse fault(
+            SoapVersion version, String code, String message, String detail, long logged) {
         return ServerResponse.status(version.httpStatusFor(code))
                 .header("Content-Type", version.contentType())
+                .header(RequestLog.REQUEST_ID_HEADER, String.valueOf(logged))
                 .body(SoapEnvelope.fault(version, code, message, detail));
     }
 

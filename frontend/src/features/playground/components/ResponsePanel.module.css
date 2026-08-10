@@ -1,0 +1,154 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-3);
+  padding: var(--tao-space-2) var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.took,
+.bytes {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+}
+
+.toggle {
+  padding: var(--tao-space-1) var(--tao-space-2);
+  font: inherit;
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--tao-radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle:hover {
+  color: var(--tao-text);
+  border-color: var(--tao-border-strong);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--tao-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Takes whatever the fixed rows leave. The payload is what this panel is for. */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/*
+ * Collapsed by default. Headers are consulted, not read: somebody checking a content type or a
+ * Retry-After knows to open them, and holding fifteen rows open would push the payload off screen
+ * for everyone who is not.
+ */
+.headers {
+  border-top: 1px solid var(--tao-border);
+  background: var(--tao-surface-sunken);
+}
+
+.summary {
+  padding: var(--tao-space-2) var(--tao-space-3);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--tao-focus-ring);
+  outline-offset: -2px;
+}
+
+.count {
+  font-family: var(--tao-font-mono);
+  color: var(--tao-text);
+}
+
+.list {
+  margin: 0;
+  padding: 0 var(--tao-space-3) var(--tao-space-3);
+  max-height: 160px;
+  overflow: auto;
+}
+
+.header {
+  display: flex;
+  gap: var(--tao-space-2);
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  line-height: 1.7;
+}
+
+.header dt {
+  color: var(--tao-text-muted);
+  flex-shrink: 0;
+}
+
+.header dd {
+  margin: 0;
+  color: var(--tao-text);
+  word-break: break-all;
+}
+
+/*
+ * Sized by its contents up to a point, then scrolls. Every field is present either way — what a
+ * long list must not do is push the payload above it off the panel, and a contract with forty
+ * optional fields would otherwise own the whole column.
+ */
+.discarded {
+  padding: var(--tao-space-3);
+  border-top: 1px solid var(--tao-border);
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+.discardedSays {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tao-space-2);
+  margin: 0 0 var(--tao-space-2);
+  font-size: var(--tao-text-xs);
+  line-height: 1.6;
+  color: var(--tao-text-muted);
+}
+
+/*
+ * The names as their own wrapping row rather than inside the sentence. Read as a set — somebody
+ * is scanning for one name they expected to matter — and a comma-separated run inside prose makes
+ * that a reading exercise that gets worse with every field.
+ */
+.discardedFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tao-space-1) var(--tao-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.discardedField {
+  padding: 0 var(--tao-space-1);
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+  background: var(--tao-surface);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-sm);
+}

@@ -71,15 +71,19 @@ public class RestRoutes {
             OperationDefinition operation, ServerRequest request, MockPipeline pipeline, RequestLog requests) {
 
         ServerRequestFacade facade = new ServerRequestFacade(request);
+        RequestLog.Source source = RequestLog.Source.of(request.headers().firstHeader(RequestLog.SOURCE_HEADER));
         var outcome = pipeline.resolve(operation, facade);
 
         if (outcome.document().isEmpty()) {
-            requests.record(outcome.trace(), HttpStatus.NOT_FOUND.value(), facade.rawBody(), null);
+            long logged =
+                    requests.record(
+                            outcome.trace(), HttpStatus.NOT_FOUND.value(), facade.rawBody(), null, source);
 
             // Loud, never empty. An empty body here would reproduce exactly the upstream
             // behaviour the sandbox exists to eliminate, and would do it invisibly.
             return ServerResponse.status(HttpStatus.NOT_FOUND)
                     .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .header(RequestLog.REQUEST_ID_HEADER, String.valueOf(logged))
                     .body(missBody(outcome.trace()));
         }
 
@@ -88,12 +92,16 @@ public class RestRoutes {
 
         // Precedence: the mock's sidecar, then what the contract declares, then a default.
         int status = meta.statusOr(operation.successStatus());
-        requests.record(outcome.trace(), status, facade.rawBody(), document.body());
+        long logged = requests.record(outcome.trace(), status, facade.rawBody(), document.body(), source);
 
         var response =
                 ServerResponse.status(status)
                         .header("Content-Type", meta.contentTypeOr(operation.responseContentType()));
         meta.headers().forEach(response::header);
+
+        // After the mock's own headers: the id is what the server did with this call, not something
+        // a stored response gets to describe.
+        response.header(RequestLog.REQUEST_ID_HEADER, String.valueOf(logged));
 
         return response.body(document.body());
     }

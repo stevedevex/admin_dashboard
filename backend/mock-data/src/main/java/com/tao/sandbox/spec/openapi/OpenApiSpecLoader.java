@@ -10,6 +10,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.SpecVersion;
+import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.OpenAPIV3Parser;
@@ -39,12 +40,17 @@ public class OpenApiSpecLoader {
      *     declare one. Kept apart from {@link OperationDefinition} because it is control-panel
      *     material — potentially many kilobytes per operation — and request handling never reads
      *     it.
+     * @param requestSchemas operationId → the request body's JSON Schema, for operations that
+     *     declare one. Kept for the same reason as the response schemas and read by the same sort
+     *     of caller: the playground drafts a request body from it, and a body built only from the
+     *     identifying keys would be missing whatever else the contract requires.
      * @param serverUrls the {@code servers} the document declares, so serving the contract can
      *     point them at the sandbox instead of at whatever host the author published
      */
     public record Loaded(
             List<OperationDefinition> operations,
             Map<String, String> responseSchemas,
+            Map<String, String> requestSchemas,
             List<String> serverUrls) {}
 
     /**
@@ -53,7 +59,7 @@ public class OpenApiSpecLoader {
     public Loaded load(ServiceConfig service, List<String> problems) {
         OpenAPI document = parse(service, problems);
         if (document == null || document.getPaths() == null) {
-            return new Loaded(List.of(), Map.of(), List.of());
+            return new Loaded(List.of(), Map.of(), Map.of(), List.of());
         }
 
         // "/" is the parser's synthetic stand-in for "the document declares no servers", not an
@@ -69,6 +75,7 @@ public class OpenApiSpecLoader {
         Map<String, Located> byOperationId = indexByOperationId(document);
         List<OperationDefinition> definitions = new ArrayList<>();
         Map<String, String> schemas = new LinkedHashMap<>();
+        Map<String, String> requestSchemas = new LinkedHashMap<>();
 
         for (OperationConfig configured : service.operations()) {
             String operationId = configured.operationId();
@@ -99,6 +106,11 @@ public class OpenApiSpecLoader {
                 schemas.put(operationId, success.schema());
             }
 
+            String requestSchema = declaredRequest(document, located.operation());
+            if (requestSchema != null) {
+                requestSchemas.put(operationId, requestSchema);
+            }
+
             definitions.add(
                     new OperationDefinition(
                             service.id(),
@@ -111,7 +123,7 @@ public class OpenApiSpecLoader {
                             configured.strategy()));
         }
 
-        return new Loaded(definitions, schemas, serverUrls);
+        return new Loaded(definitions, schemas, requestSchemas, serverUrls);
     }
 
     private OpenAPI parse(ServiceConfig service, List<String> problems) {
@@ -231,6 +243,23 @@ public class OpenApiSpecLoader {
 
         contentType = response.getContent().keySet().iterator().next();
         return new Success(status, contentType, schemaOf(document, response.getContent().get(contentType)));
+    }
+
+    /**
+     * The request body's schema, for the operations that declare one.
+     *
+     * <p>The first declared media type wins, as it does for responses. An operation with no request
+     * body — every GET, and plenty of DELETEs — answers null, which is an ordinary answer rather
+     * than a fault.
+     */
+    private String declaredRequest(OpenAPI document, Operation operation) {
+        RequestBody body = operation.getRequestBody();
+        if (body == null || body.getContent() == null || body.getContent().isEmpty()) {
+            return null;
+        }
+
+        String contentType = body.getContent().keySet().iterator().next();
+        return schemaOf(document, body.getContent().get(contentType));
     }
 
     /**

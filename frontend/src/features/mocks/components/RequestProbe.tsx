@@ -1,7 +1,8 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { api, type ResolutionTrace } from '@/api';
-import { mockHandoffAtom } from '@/state/handoff';
+import { mockHandoffAtom, playgroundHandoffAtom } from '@/state/handoff';
 import { Button, CodeEditor, Icon, Tag } from '@/ui';
 import { requestProbeAtom, selectedMockIdAtom, viewedScenarioAtom } from '../atoms';
 import styles from './RequestProbe.module.css';
@@ -28,6 +29,8 @@ export function RequestProbe() {
   const scenarioId = useAtomValue(viewedScenarioAtom);
   const setSelected = useSetAtom(selectedMockIdAtom);
   const setHandoff = useSetAtom(mockHandoffAtom);
+  const setPlayground = useSetAtom(playgroundHandoffAtom);
+  const navigate = useNavigate();
 
   const [method, setMethod] = useState('GET');
   const [path, setPath] = useState('');
@@ -77,6 +80,25 @@ export function RequestProbe() {
     } finally {
       setRunning(false);
     }
+  };
+
+  /**
+   * The same request, actually sent.
+   *
+   * Offered because the two questions arrive in that order far more often than not: somebody
+   * establishes that a request reaches the file they expected, and immediately wants to know what
+   * that file turns into on the wire. Handed over rather than answered here — this panel is a
+   * diagnostic sharing a column with the payload editor, and a response belongs where there is room
+   * to read one.
+   */
+  const handOver = async () => {
+    setPlayground({
+      ...(soap ? { body } : { method, path, ...(body ? { body } : {}) }),
+      scenarioId,
+      // Not sent on arrival: this is a thought in progress, not a decision somebody has made.
+      send: false,
+    });
+    await navigate('/mock-data/playground');
   };
 
   const open = (mockId: string) => {
@@ -154,6 +176,18 @@ export function RequestProbe() {
           >
             {running ? 'Resolving…' : 'Resolve'}
           </Button>
+
+          {/* Only once there is a request to carry over — an empty handover would land on the
+              playground with nothing in it, which is worse than not offering the trip. */}
+          {runnable && (
+            <Button
+              emphasis="muted"
+              icon={<Icon name="playground" size={14} />}
+              onClick={() => void handOver()}
+            >
+              Send it
+            </Button>
+          )}
         </div>
 
         {showBody && (

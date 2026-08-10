@@ -3,6 +3,7 @@ import { DEFAULT_ROUTE } from '@/config/navigation';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { MocksPage } from '@/features/mocks/MocksPage';
 import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
+import { PlaygroundPage } from '@/features/playground/PlaygroundPage';
 import { RequestsPage } from '@/features/requests/RequestsPage';
 import { ScenariosPage } from '@/features/scenarios/ScenariosPage';
 import { ServicesPage } from '@/features/services/ServicesPage';
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: 'mock-data/mocks', element: <MocksPage /> },
       { path: 'mock-data/scenarios', element: <ScenariosPage /> },
       { path: 'mock-data/requests', element: <RequestsPage /> },
+      { path: 'mock-data/playground', element: <PlaygroundPage /> },
       {
         path: 'phase-2',
         element: <PlaceholderPage title="Phase 2" summary="Reserved for the next capability." />,

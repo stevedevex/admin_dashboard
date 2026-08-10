@@ -127,3 +127,12 @@
 .muted {
   color: var(--tao-text-muted);
 }
+
+/*
+ * Wide enough for the tag, so the column does not resize as playground calls arrive among the
+ * application's. A log that reflows while it is being read loses the reader's place.
+ */
+.source {
+  width: 6.5rem;
+  white-space: nowrap;
+}

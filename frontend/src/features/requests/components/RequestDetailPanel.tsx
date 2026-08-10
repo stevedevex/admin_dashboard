@@ -3,9 +3,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api, type RequestDetail } from '@/api';
 import { useAsync } from '@/hooks/useAsync';
-import { mockHandoffAtom } from '@/state/handoff';
+import { mockHandoffAtom, playgroundHandoffAtom } from '@/state/handoff';
 import { Button, CodeEditor, EmptyState, Icon, MetaTag, Panel, Tag } from '@/ui';
-import { languageOf, prettify } from '../prettify';
+import { fileOf, sameFile, scenarioIn } from '@/lib/mockPath';
+import { isEnvelope } from '@/lib/protocol';
+import { languageOf, prettify } from '@/lib/prettify';
 import styles from './RequestDetailPanel.module.css';
 
 /**
@@ -50,12 +52,72 @@ function useCreateMock() {
 
   const open = async (entry: RequestDetail) => {
     if (entry.matched === null) return;
-    const [scenarioId = ''] = entry.matched.split('/');
-    setHandoff({ mockId: entry.matched, scenarioId });
+    setHandoff({ mockId: entry.matched, scenarioId: scenarioIn(entry.matched) });
     await navigate('/mock-data/mocks');
   };
 
   return { create, open, busy, error };
+}
+
+/**
+ * Sends a recorded call again, in the playground.
+ *
+ * Two ways there, because the log keeps a body but not a URL. A SOAP call is replayed from the
+ * envelope it actually sent, which is the truest possible repeat. A REST call has to be rebuilt —
+ * and is rebuilt from `extracted`, the very values the server pulled out of the original, so the
+ * reconstruction reaches the same operation with the same identity rather than being a guess at
+ * what the path might have been.
+ */
+function useSendAgain() {
+  const navigate = useNavigate();
+  const setPlayground = useSetAtom(playgroundHandoffAtom);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Either there are bytes worth resending, or there is enough to rebuild them from. A call
+   * rejected before it reached an operation has no operation to redraft against, but it does still
+   * have the envelope that was rejected — and sending that again is exactly how somebody checks
+   * whether they have fixed it.
+   */
+  const canSend = (entry: RequestDetail) =>
+    (entry.requestBody !== null && entry.requestBody !== '' && isEnvelope(entry.requestBody)) ||
+    (entry.serviceId !== null && entry.operationId !== null);
+
+  const sendAgain = async (entry: RequestDetail) => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (entry.requestBody && isEnvelope(entry.requestBody)) {
+        setPlayground({
+          body: entry.requestBody,
+          ...(entry.scenarioId ? { scenarioId: entry.scenarioId } : {}),
+          send: true,
+        });
+      } else {
+        const draft = await api.draftRequest(
+          entry.serviceId ?? '',
+          entry.operationId ?? '',
+          entry.extracted,
+        );
+        setPlayground({
+          method: draft.method ?? 'GET',
+          path: draft.path,
+          ...(draft.body ? { body: draft.body } : {}),
+          ...(entry.scenarioId ? { scenarioId: entry.scenarioId } : {}),
+          send: true,
+        });
+      }
+
+      await navigate('/mock-data/playground');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { sendAgain, canSend, busy, error };
 }
 
 /** One call in full: what identified it, what was tried, and both payloads. */
@@ -76,6 +138,7 @@ export function RequestDetailPanel({ entryId }: { entryId: string | null }) {
 function Loaded({ entryId }: { entryId: string }) {
   const state = useAsync<RequestDetail | null>(() => api.getRequest(entryId), [entryId]);
   const mock = useCreateMock();
+  const again = useSendAgain();
 
   if (state.status === 'loading') return <p className="pad-4 muted">Loading…</p>;
   if (state.status === 'error') return <p className="pad-4 muted">{state.error.message}</p>;
@@ -109,6 +172,20 @@ function Loaded({ entryId }: { entryId: string }) {
 
         <div className={styles.actions}>
           {mock.error && <span className={styles.error}>{mock.error}</span>}
+          {again.error && <span className={styles.error}>{again.error}</span>}
+
+          {/* The loop this page is the middle of: see what a call got, change the mock, send it
+              again. Without this the last step means retyping the request somewhere else. */}
+          {again.canSend(entry) && (
+            <Button
+              emphasis="secondary"
+              icon={<Icon name="playground" size={14} />}
+              disabled={again.busy}
+              onClick={() => void again.sendAgain(entry)}
+            >
+              {again.busy ? 'Sending…' : 'Send again'}
+            </Button>
+          )}
           {/* Offered whatever happened, because falling through to an operation's default is the
               same request as a miss: this call did not get an answer written for it. The draft
               names the specific file that would serve it. */}
@@ -128,7 +205,7 @@ function Loaded({ entryId }: { entryId: string }) {
               icon={<Icon name="mocks" size={14} />}
               onClick={() => void mock.open(entry)}
             >
-              Open {entry.matched.split('/').pop()}
+              Open {fileOf(entry.matched)}
             </Button>
           )}
         </div>
@@ -199,7 +276,7 @@ function Loaded({ entryId }: { entryId: string }) {
                 click away on the Mocks page — repeating a payload here would bury the request,
                 which is the half nobody can read anywhere else. */}
             answered {entry.status} {reasonFor(entry.status)}
-            {entry.matched !== null && <> from {entry.matched.split('/').pop()}</>}
+            {entry.matched !== null && <> from {fileOf(entry.matched)}</>}
           </span>
         </h3>
 
@@ -239,24 +316,4 @@ function reasonFor(status: number): string {
     503: 'Service Unavailable',
   };
   return reasons[status] ?? '';
-}
-
-/**
- * Whether an attempted store path and a matched mock id name the same file.
- *
- * The two are written differently — `scenarios/baseline/petstore/showPetById/petid=1` against
- * `baseline/petstore/showPetById/petid=1.json` — because one is a candidate the resolver formed
- * and the other is an address. Extension included on one side only, since resolution matches on
- * the stem: any sibling with the right name is the mock.
- */
-function sameFile(attempted: string, matched: string): boolean {
-  const stem = (path: string) => {
-    const file = path.split('/').pop() ?? path;
-    const dot = file.lastIndexOf('.');
-    return dot > 0 ? file.slice(0, dot) : file;
-  };
-
-  const scenarioOf = (path: string) => path.replace(/^scenarios\//, '').split('/')[0];
-
-  return stem(attempted) === stem(matched) && scenarioOf(attempted) === scenarioOf(matched);
 }

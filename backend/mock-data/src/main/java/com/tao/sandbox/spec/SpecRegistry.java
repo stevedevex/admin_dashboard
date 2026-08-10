@@ -42,6 +42,7 @@ public class SpecRegistry {
     private final Map<String, OperationDefinition> restByKey = new LinkedHashMap<>();
     private final Map<String, SoapServiceDefinition> soapByService = new LinkedHashMap<>();
     private final Map<String, String> responseSchemas = new LinkedHashMap<>();
+    private final Map<String, String> requestSchemas = new LinkedHashMap<>();
     private final Map<String, Contract> contracts = new LinkedHashMap<>();
     private final List<ServiceDescriptor> descriptors = new ArrayList<>();
 
@@ -65,6 +66,8 @@ public class SpecRegistry {
                 loaded.operations().forEach(op -> restByKey.put(key(op.serviceId(), op.operationId()), op));
                 loaded.responseSchemas()
                         .forEach((operationId, schema) -> responseSchemas.put(key(service.id(), operationId), schema));
+                loaded.requestSchemas()
+                        .forEach((operationId, schema) -> requestSchemas.put(key(service.id(), operationId), schema));
                 descriptors.add(describeRest(service, loaded.operations()));
                 retainRestContract(service, loaded.serverUrls(), problems);
             } else {
@@ -195,6 +198,19 @@ public class SpecRegistry {
      */
     public Optional<String> findResponseSchema(String serviceId, String operationId) {
         return Optional.ofNullable(responseSchemas.get(key(serviceId, operationId)));
+    }
+
+    /**
+     * The request body's schema, for operations whose contract declares one.
+     *
+     * <p>Empty for every GET, and for any operation that takes no body — an ordinary answer, not a
+     * fault. Read by the playground, which drafts a body from it: one built only from the
+     * identifying keys would satisfy resolution and still be missing whatever else the contract
+     * requires, which is the difference between a request that reaches the right mock and one a
+     * real service would have accepted.
+     */
+    public Optional<String> findRequestSchema(String serviceId, String operationId) {
+        return Optional.ofNullable(requestSchemas.get(key(serviceId, operationId)));
     }
 
     /**

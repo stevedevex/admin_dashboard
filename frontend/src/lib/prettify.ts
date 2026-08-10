@@ -10,6 +10,8 @@
  * one that declines.
  */
 
+import { isEnvelope } from './protocol';
+
 const INDENT = '  ';
 
 export function prettifyJson(source: string): string {
@@ -70,7 +72,7 @@ export function prettify(source: string): string {
   return source;
 }
 
-/** What CodeMirror should highlight it as. */
+/** What CodeMirror should highlight it as — the same shape test that decides the protocol. */
 export function languageOf(source: string): 'json' | 'xml' {
-  return source.trimStart().startsWith('<') ? 'xml' : 'json';
+  return isEnvelope(source) ? 'xml' : 'json';
 }

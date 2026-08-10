@@ -1,0 +1,95 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-3);
+  padding: var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+  background: var(--tao-surface-sunken);
+}
+
+/*
+ * Two equal columns rather than a flex row that wraps. The narrower of the two panels holds this,
+ * and letting the selects size to their content had them jump between one line and two as services
+ * with longer names were chosen — the controls moving while somebody is aiming at them.
+ */
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tao-space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-1);
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.label {
+  font-size: var(--tao-label-size);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
+  color: var(--tao-text-muted);
+}
+
+.select {
+  font: inherit;
+  font-size: var(--tao-text-sm);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}
+
+/*
+ * Wraps rather than scrolls. An operation with six keys is a row of six small fields, and hiding
+ * the sixth behind a scrollbar would hide the one somebody is looking for.
+ */
+.keys {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-3);
+  flex-wrap: wrap;
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  gap: var(--tao-space-2);
+}
+
+.keyName {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  color: var(--tao-text);
+  cursor: help;
+}
+
+/* The field's real name, when the key is an alias somebody chose to keep file names short. */
+.alias {
+  color: var(--tao-text-muted);
+  font-style: normal;
+}
+
+.keyValue {
+  width: 9ch;
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border-strong);
+  border-radius: var(--tao-radius-sm);
+  background: var(--tao-surface);
+  color: var(--tao-text);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--tao-text-sm);
+  color: var(--tao-error);
+}
