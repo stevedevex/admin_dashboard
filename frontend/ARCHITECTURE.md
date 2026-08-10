@@ -95,8 +95,7 @@ including disabled placeholders.
 
 **The domain is generic.** Types are `Service`, `Scenario`, `MockFile`, `Schema` — a mock server
 for anything. No vocabulary from any particular organisation or product appears in this
-repository, in any form, including comments, fixtures and commit history. See `.denyterms.example`
-and `npm run guard`.
+repository, in any form, including comments, fixtures and commit history.
 
 **One component per file, named for the file.** Co-locate a component's styles as
 `Component.module.css` beside it. Tests live beside the code as `Component.test.tsx`.
@@ -104,7 +103,7 @@ and `npm run guard`.
 ## Conventions
 
 |            |                                                                               |
-| ---------- | ----------------------------------------------------------------------------- |
+|------------|-------------------------------------------------------------------------------|
 | Imports    | `@/` alias for `src/`; never `../../..`                                       |
 | Components | `PascalCase.tsx`, default-free named exports                                  |
 | Hooks      | `useThing.ts`, one hook per file                                              |

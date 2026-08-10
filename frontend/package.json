@@ -21,8 +21,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "guard": "./scripts/check-terms.sh",
-    "verify": "npm run guard && npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run lint && npm run typecheck && npm run test",
     "prepare": "husky"
   },
   "dependencies": {

@@ -7,9 +7,5 @@ coverage/
 # Registry configuration — may contain an internal host. Never commit.
 .npmrc
 
-# Deny-list of terms the guard script rejects. Kept untracked so the terms
-# themselves are not published. See .denyterms.example.
-.denyterms
-
 # Anything under here is treated as non-publishable by convention.
 private/

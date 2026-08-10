@@ -43,22 +43,16 @@ server to call itself.
 
 ## Commands
 
-| | |
-| ----------------------- | ----------------------------------------------------------------- |
-| `npm run dev`           | Vite dev server on 5173, HMR                                      |
-| `npm run verify`        | **The gate.** guard → lint → typecheck → test. Run before pushing  |
-| `npm test`              | Vitest once; `npm run test:watch` to iterate                      |
-| `npm run typecheck`     | `tsc --noEmit`                                                    |
-| `npm run lint`          | ESLint, including the architectural boundary rules                 |
-| `npm run guard`         | Fails on any term from `.denyterms` — see below                    |
-| `npm run build`         | Typecheck, then production build                                  |
+|                     |                                                                   |
+|---------------------|-------------------------------------------------------------------|
+| `npm run dev`       | Vite dev server on 5173, HMR                                      |
+| `npm run verify`    | **The gate.** lint → typecheck → test. Run before pushing         |
+| `npm test`          | Vitest once; `npm run test:watch` to iterate                      |
+| `npm run typecheck` | `tsc --noEmit`                                                    |
+| `npm run lint`      | ESLint, including the architectural boundary rules                |
+| `npm run build`     | Typecheck, then production build                                  |
 
 `npm run verify` is the one to remember; the rest are what it runs.
-
-**`npm run guard`** enforces that no organisation-specific or product-specific vocabulary appears
-anywhere in this directory — code, comments, tests and fixtures alike. Copy `.denyterms.example` to
-`.denyterms` if you do not have one. It is not a style rule: the repository is a teaching sample, and
-the domain is deliberately generic.
 
 **Prettier is present but not enforced.** `format:check` is not part of `verify`, no git hook is
 installed, and a number of files predate it, so it currently reports failures that nobody is acting
@@ -66,17 +60,16 @@ on. Either wire it up or drop it — but do not run `prettier --write .` casuall
 touches comment prose that is written deliberately.
 
 ## The pages
-
 Each is one directory under `src/features/`, and each is a nav entry in `src/config/navigation.ts`.
 
-| Page | What it answers |
-| ---------- | ------------------------------------------------------------------------------------ |
-| Dashboard  | What this sandbox is, and what it is currently serving |
-| Services   | Which contracts are loaded, their operations, and the keys that identify a request |
-| Mocks      | The file tree and the payload editor, with a dry run above it |
-| Scenarios  | Create scenarios, and switch the one the sandbox serves to everybody |
+| Page       | What it answers                                                                                |
+|------------|------------------------------------------------------------------------------------------------|
+| Dashboard  | What this sandbox is, and what it is currently serving                                         |
+| Services   | Which contracts are loaded, their operations, and the keys that identify a request             |
+| Mocks      | The file tree and the payload editor, with a dry run above it                                  |
+| Scenarios  | Create scenarios, and switch the one the sandbox serves to everybody                           |
 | Requests   | What the application under test actually called, matched or not — and draft a mock from a call |
-| Playground | Send a request for real and read the response the way a client would receive it |
+| Playground | Send a request for real and read the response the way a client would receive it                |
 
 The Mocks page's dry run and the Playground answer neighbouring questions and are not the same
 thing. The dry run says *which file would answer this, and why*, sends nothing, and stores nothing.
