@@ -33,7 +33,17 @@ export function DashboardPage() {
   const log = useRequestLog();
 
   const facts = summary.status === 'ready' ? summary.data : null;
-  const problems = facts === null ? 0 : facts.invalidCount + facts.incompleteCount;
+
+  /**
+   * What is worth someone's attention, across both kinds of wrong.
+   *
+   * Unreachable belongs here even though it is not a validation verdict. A mock at an address no
+   * request produces is the one failure with no symptom anywhere else — it lists, it validates
+   * clean, and it silently never answers — so a band reading "all mocks healthy" over one is the
+   * single most misleading thing this page could say.
+   */
+  const problems =
+    facts === null ? 0 : facts.invalidCount + facts.incompleteCount + facts.unreachableCount;
 
   /**
    * How many mocks anything has actually looked at.
@@ -105,6 +115,21 @@ export function DashboardPage() {
               ? 'nothing checked yet'
               : 'all fully populated',
       attention: facts !== null && facts.incompleteCount > 0,
+      to: '/mock-data/mocks',
+    },
+    {
+      // Not gated on `nothingChecked`: reachability is read off the file name and the operation's
+      // configuration, so it is known for every mock from the moment the store is read. Unlike the
+      // two above it, a zero here always means zero.
+      label: 'Unreachable',
+      value: facts === null ? '—' : String(facts.unreachableCount),
+      note:
+        facts === null
+          ? ''
+          : facts.unreachableCount > 0
+            ? 'no request produces the name'
+            : 'every name is reachable',
+      attention: facts !== null && facts.unreachableCount > 0,
       to: '/mock-data/mocks',
     },
   ];

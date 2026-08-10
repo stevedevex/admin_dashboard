@@ -1,0 +1,20 @@
+.content {
+  padding: var(--tao-space-1) var(--tao-space-2);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-md);
+  background: var(--tao-surface);
+  box-shadow: var(--tao-shadow-md);
+  font-size: var(--tao-text-sm);
+  line-height: 1.4;
+  color: var(--tao-text);
+
+  /* Above the rail, which sits above the page. */
+  z-index: 40;
+
+  /* A label, never a paragraph: past this it is documentation in the wrong place. */
+  max-width: 16rem;
+}
+
+.arrow {
+  fill: var(--tao-surface);
+}

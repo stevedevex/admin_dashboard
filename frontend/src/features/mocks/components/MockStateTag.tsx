@@ -50,3 +50,27 @@ export function MockStateTag({ state, compact = false }: { state: MockState; com
     </Tag>
   );
 }
+
+/**
+ * A file at an address no request produces.
+ *
+ * Its own tag rather than another {@link MockState}, because it is a different axis and the two are
+ * independent: this file's payload may be perfectly valid, and usually is — the name is what is
+ * wrong. Folding it into the state would force a choice between reporting the payload and
+ * reporting the address, and whichever lost would be the one the author needed.
+ *
+ * Worth drawing loudly despite being nobody's fault. It is the only failure here with no symptom
+ * anywhere else: the file lists, it validates, and it silently never answers, because the
+ * operation's default answers in its place.
+ */
+export function UnreachableTag({ reason, compact = false }: { reason: string; compact?: boolean }) {
+  return (
+    <Tag
+      tone="error"
+      icon={<Icon name="warn" size={12} />}
+      title={`Unreachable — ${reason}`}
+    >
+      {compact ? '' : 'unreachable'}
+    </Tag>
+  );
+}

@@ -39,7 +39,9 @@ export function ServingBand({ activeScenarioId, scenario, problems }: ServingBan
           tone={problems > 0 ? 'warn' : 'ok'}
           icon={<Icon name={problems > 0 ? 'warn' : 'ok'} size={12} />}
         >
-          {problems > 0 ? `${problems} need attention` : 'all mocks healthy'}
+          {problems > 0
+            ? `${problems} ${problems === 1 ? 'needs' : 'need'} attention`
+            : 'all mocks healthy'}
         </Tag>
 
         {scenario?.extends ? (

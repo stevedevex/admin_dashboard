@@ -45,6 +45,7 @@ type WireSummary = {
   invalidCount: number;
   incompleteCount: number;
   uncheckedCount: number;
+  unreachableCount: number;
   largestMockBytes: number;
 };
 
@@ -88,6 +89,8 @@ type WireMockSummary = {
   inheritedFrom: string | null;
   state: string;
   completeness: number | null;
+  reachable: boolean;
+  unreachableReason: string | null;
 };
 
 type WireMockDetail = {
@@ -196,6 +199,8 @@ function toMockSummary(wire: WireMockSummary): MockSummary {
     state: asState(wire.state),
     completeness: wire.completeness,
     inherited: wire.inherited,
+    reachable: wire.reachable,
+    unreachableReason: wire.unreachableReason,
     modifiedAt: wire.modifiedAt,
   };
 }
@@ -331,6 +336,10 @@ export const httpTransport: Transport = {
           state: 'unchecked' as MockState,
           completeness: null,
           inherited: false,
+          // Unindexed, so nothing has judged its name either. Claiming it is reachable would be
+          // the same overstatement as calling an unvalidated payload valid.
+          reachable: true,
+          unreachableReason: null,
           modifiedAt: new Date().toISOString(),
         };
 

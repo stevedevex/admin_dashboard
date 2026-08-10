@@ -35,7 +35,7 @@ import { CasePicker } from './CasePicker';
 import { ContractStrip } from './ContractStrip';
 import { GenerateDialog } from './GenerateDialog';
 import { IssueList } from './IssueList';
-import { MockStateTag } from './MockStateTag';
+import { MockStateTag, UnreachableTag } from './MockStateTag';
 import styles from './MockPayloadPanel.module.css';
 
 /**
@@ -275,6 +275,7 @@ function Loaded({
               <MetaTag label="Complete" value={`${mock.completeness}%`} />
             )}
             <MockStateTag state={mock.state} />
+            {mock.reachable ? null : <UnreachableTag reason={mock.unreachableReason ?? ''} />}
             {mock.inherited && (
               <Tag tone="info" icon={<Icon name="scenarios" size={11} />}>
                 inherited from {mock.scenarioId}

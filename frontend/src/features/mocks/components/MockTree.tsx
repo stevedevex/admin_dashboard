@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Icon } from '@/ui';
 import type { OperationNode, TreeNode } from '../hooks/useMockTree';
 import { worstState } from '../operationState';
-import { MockStateTag } from './MockStateTag';
+import { MockStateTag, UnreachableTag } from './MockStateTag';
 import styles from './MockTree.module.css';
 
 export type MockTreeProps = {
@@ -123,6 +123,12 @@ function OperationRow({
         </span>
         {inherited && <Icon name="scenarios" size={11} />}
         <span className={styles.count}>{operation.mocks.length}</span>
+        {operation.mocks.some((mock) => !mock.reachable) ? (
+          <UnreachableTag
+            reason={`${operation.mocks.filter((mock) => !mock.reachable).length} of this operation's files sit at an address no request produces.`}
+            compact
+          />
+        ) : null}
         <MockStateTag state={worstState(operation.mocks)} compact />
       </button>
     </li>

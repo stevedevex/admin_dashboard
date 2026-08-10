@@ -3,7 +3,7 @@ import type { KeyField, MockSummary } from '@/api';
 import { formatBytes } from '@/lib/format';
 import { Icon, TextInput } from '@/ui';
 import { caseLabel, describeCase, matchesCase, type CaseName } from '../caseName';
-import { MockStateTag } from './MockStateTag';
+import { MockStateTag, UnreachableTag } from './MockStateTag';
 import styles from './CasePicker.module.css';
 
 /**
@@ -256,6 +256,9 @@ export function CasePicker({ files, selectedId, fileName, keys, onSelect }: Case
                     </span>
                   )}
                   <span className={styles.size}>{formatBytes(file.sizeBytes)}</span>
+                  {file.reachable ? null : (
+                    <UnreachableTag reason={file.unreachableReason ?? ''} compact />
+                  )}
                   <MockStateTag state={file.state} />
                 </button>
               </li>

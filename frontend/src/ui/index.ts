@@ -21,6 +21,9 @@ export type { PanelProps } from './primitives/Panel';
 export { Dialog, Field } from './primitives/Dialog';
 export type { DialogProps } from './primitives/Dialog';
 
+export { Tooltip, TooltipProvider } from './primitives/Tooltip';
+export type { TooltipProps } from './primitives/Tooltip';
+
 export { TextInput, TextArea, Select } from './primitives/Input';
 export type { TextInputProps, TextAreaProps, SelectProps } from './primitives/Input';
 

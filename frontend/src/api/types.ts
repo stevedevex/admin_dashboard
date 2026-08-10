@@ -81,6 +81,13 @@ export type MockSummary = {
   completeness: number | null;
   /** True when served from a parent scenario rather than this one. */
   inherited: boolean;
+  /**
+   * Whether any request could produce this file's name. False is not a broken payload — it is a
+   * file at an address nothing computes, so it never answers and the operation's default does.
+   */
+  reachable: boolean;
+  /** Why not, in words an author can act on. Null when reachable. */
+  unreachableReason: string | null;
   modifiedAt: string;
 };
 
@@ -132,6 +139,16 @@ export type MockDataSummary = {
    * is indistinguishable from a library checked end to end and found clean.
    */
   uncheckedCount: number;
+  /**
+   * How many mocks sit at an address no request produces — named for a key the operation does not
+   * declare, or for a subset under a strategy that demands all of them.
+   *
+   * Counted apart from the validation buckets because it is a different kind of wrong: those
+   * describe a payload, this describes an address, and a mock can be flawless on one and hopeless
+   * on the other. It has to be surfaced somewhere, because nothing about serving reveals it — the
+   * file never wins and the operation's default answers in its place.
+   */
+  unreachableCount: number;
   largestMockBytes: number;
 };
 
