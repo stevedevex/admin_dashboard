@@ -1,10 +1,10 @@
 import { useAtom } from 'jotai';
 import { useState } from 'react';
 import { PageHeader } from '@/app/layout/PageHeader';
-import { api, type PlaygroundResult } from '@/api';
+import { api } from '@/api';
 import type { PlaygroundHandoff } from '@/state/handoff';
 import { Button, CodeEditor, EmptyState, Icon, Panel, Tag } from '@/ui';
-import { bodyAtom, methodAtom, pathAtom, scenarioAtom } from './atoms';
+import { bodyAtom, methodAtom, noteAtom, pathAtom, resultAtom, scenarioAtom } from './atoms';
 import { OperationPicker, type Drafted } from './components/OperationPicker';
 import { ResponsePanel } from './components/ResponsePanel';
 import { ScenarioChoice } from './components/ScenarioChoice';
@@ -41,9 +41,13 @@ export function PlaygroundPage() {
   const [body, setBody] = useAtom(bodyAtom);
   const [scenario, setScenario] = useAtom(scenarioAtom);
 
-  const [result, setResult] = useState<PlaygroundResult | null>(null);
+  const [result, setResult] = useAtom(resultAtom);
+  const [note, setNote] = useAtom(noteAtom);
+
+  // Local, unlike the two above. A failure to send describes an attempt, not a state worth
+  // returning to — and a stale error greeting somebody on arrival would describe a request they
+  // can no longer see.
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   const soap = isEnvelope(body);
