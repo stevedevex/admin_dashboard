@@ -1,0 +1,87 @@
+/*
+ * One sheet per capability, in the same tint the rail lays under a hovered item.
+ *
+ * An outline on the page's own ground was the first attempt and it did not work: with the same
+ * colour on both sides of the edge, the boundary read as a stray rule rather than as a region.
+ * The fix is a ground of its own, and `--tao-surface-sunken` is the one the product already uses
+ * to say "this region, not that one" — reusing it means the page has one such tint rather than a
+ * second one invented here that is nearly but not quite the same.
+ *
+ * Quiet on purpose. The grouping has to be legible, not loud: the cards keep their own white and
+ * their lift, so the order reads page, sheet, card, and the sheet is the only new thing to see.
+ */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-4);
+  padding: var(--tao-space-4) var(--tao-space-4) var(--tao-space-5);
+  background: var(--tao-surface-sunken);
+  border: 1px solid var(--tao-border);
+  border-radius: var(--tao-radius-lg);
+}
+
+/*
+ * A capability with nothing to report gets no sheet: an outline on the page ground, dashed.
+ *
+ * The distinction is the point. A sheet says "here is what this is doing"; an empty sheet would
+ * say the same thing and then fail to do it, which reads as a panel that failed to load rather
+ * than as a capability nobody has built yet.
+ */
+.sectionPlanned {
+  composes: section;
+  background: transparent;
+  border-style: dashed;
+  padding-bottom: var(--tao-space-4);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tao-space-2) var(--tao-space-4);
+  padding-bottom: var(--tao-space-3);
+  border-bottom: 1px solid var(--tao-border);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-1);
+  min-width: 0;
+}
+
+/*
+ * Sized level with the page title rather than under it. The containment is what ranks these — a
+ * heading inside a box, beneath a title outside every box, cannot be mistaken for the page's own.
+ * Giving it a smaller size as well would rank it below the panel headings it contains.
+ */
+.name {
+  margin: 0;
+  font-size: var(--tao-text-xl);
+  font-weight: var(--tao-weight-display);
+  line-height: 1.2;
+  color: var(--tao-text);
+}
+
+.summary {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--tao-text-sm);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-4);
+}
+
+/* Said once, quietly. A planned capability has no facts to report, and inventing a shape for it
+   would be a mock-up of a feature sitting on the page that describes real ones. */
+.pending {
+  margin: 0;
+  font-size: var(--tao-text-sm);
+  color: var(--tao-text-muted);
+}

@@ -27,6 +27,49 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+/**
+ * What the product can do, as opposed to where you can go.
+ *
+ * Two lists because they answer different questions, and the dashboard needs the one the rail
+ * does not have. The rail lists destinations: a capability with no pages yet contributes nothing
+ * to it beyond a dimmed row. The dashboard has to name the capability itself — including the ones
+ * that do not exist — because a landing page showing only what is built cannot be read as
+ * "this is one of three things"; it reads as "this is the product".
+ *
+ * `id` is the same id as the nav group the capability owns, and `navigation.test.ts` holds them
+ * together: a live capability with no group is a section on the dashboard that leads nowhere.
+ *
+ * @param summary one line, in the reader's terms, saying what the capability is for. Shown under
+ *   the name on the dashboard — it is the only place the product says what any of this is.
+ */
+export type Capability = {
+  id: string;
+  name: string;
+  summary: string;
+  status: 'live' | 'planned';
+};
+
+export const capabilities: Capability[] = [
+  {
+    id: 'mock-data',
+    name: 'Mock data',
+    summary: 'Stand in for the services an application depends on, so it can be run and tested without them.',
+    status: 'live',
+  },
+  {
+    id: 'phase-2',
+    name: 'Phase 2',
+    summary: 'The next capability. Not built yet — it will report itself here when it is.',
+    status: 'planned',
+  },
+  {
+    id: 'phase-3',
+    name: 'Phase 3',
+    summary: 'The one after that. Not built yet — it will report itself here when it is.',
+    status: 'planned',
+  },
+];
+
 export const navigation: NavGroup[] = [
   {
     id: 'root',
@@ -35,7 +78,7 @@ export const navigation: NavGroup[] = [
   },
   {
     id: 'mock-data',
-    label: 'Mock Data',
+    label: 'Mock data',
     items: [
       { id: 'services', label: 'Services', path: '/mock-data/services', icon: 'service' },
       { id: 'mocks', label: 'Mocks', path: '/mock-data/mocks', icon: 'mocks' },

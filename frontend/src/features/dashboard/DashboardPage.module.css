@@ -1,7 +1,9 @@
+/* Sections are separated by more than the cards inside them are, so the grouping is legible
+   before anything is read — the gap is what says which panels belong to which capability. */
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--tao-space-4);
+  gap: var(--tao-space-5);
   /* Bounded so the ruled bands keep a readable measure on a wide monitor. Without it the metric
      tiles drift to opposite edges of a 4K display and stop reading as one row. */
   max-width: 1600px;

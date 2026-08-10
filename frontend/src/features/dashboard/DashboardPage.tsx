@@ -5,21 +5,28 @@ import { useAsync } from '@/hooks/useAsync';
 import { useRequestLog } from '@/hooks/useRequestLog';
 import { storeNonceAtom } from '@/state/store';
 import { formatBytes } from '@/lib/format';
+import { capabilities } from '@/config/navigation';
 import { MetricStrip, type Metric } from './components/MetricStrip';
 import { ServingBand } from './components/ServingBand';
 import { ActivityPanel } from './components/ActivityPanel';
+import { CapabilitySection } from './components/CapabilitySection';
 import { CoveragePanel } from './components/CoveragePanel';
-import { RoadmapStrip } from './components/RoadmapStrip';
 import styles from './DashboardPage.module.css';
 
 /**
- * The landing page: what is being served, what exists, and what is arriving.
+ * The landing page: one section per capability the product has.
  *
- * Ordered by how quickly a fact goes stale rather than by how much of it there is. The served
- * scenario changes what every caller receives and leads; the library counts change when someone
- * authors a mock; the request feed changes while being watched. Someone opening this page mid-
- * debug is asking "is my application reaching this, and is it getting what I think" — both halves
- * of that are answerable here without navigating.
+ * Structured by capability rather than by panel, because the panels alone cannot say what they
+ * are panels *of*. Everything on this page describes mock data, and laid out as a flat run of
+ * cards that fact is invisible — the page reads as the whole product, which is true only until
+ * there is a second capability. Naming the boundary while there is one thing inside it is what
+ * makes the second one an addition rather than a redesign.
+ *
+ * Within the mock-data section the order is by how quickly a fact goes stale rather than by how
+ * much of it there is. The served scenario changes what every caller receives and leads; the
+ * library counts change when someone authors a mock; the request feed changes while being
+ * watched. Someone opening this page mid-debug is asking "is my application reaching this, and is
+ * it getting what I think" — both halves of that are answerable here without navigating.
  *
  * Each region loads independently. A backend that answers the catalogue but not the log leaves a
  * page with one broken panel, not a blank screen.
@@ -42,8 +49,7 @@ export function DashboardPage() {
    * clean, and it silently never answers — so a band reading "all mocks healthy" over one is the
    * single most misleading thing this page could say.
    */
-  const problems =
-    facts === null ? 0 : facts.invalidCount + facts.incompleteCount + facts.unreachableCount;
+  const problems = facts === null ? 0 : facts.invalidCount + facts.incompleteCount + facts.unreachableCount;
 
   /**
    * How many mocks anything has actually looked at.
@@ -134,35 +140,41 @@ export function DashboardPage() {
     },
   ];
 
+  // Rendered from the capability list rather than written out, so a capability that becomes real
+  // is a change to `config/navigation.ts` and a case below — never a re-layout of this page.
+  const mockData = capabilities.find((capability) => capability.id === 'mock-data');
+  const rest = capabilities.filter((capability) => capability.id !== 'mock-data');
+
   return (
     <>
       <PageHeader title="Dashboard" />
 
       <div className={styles.page}>
-        <ServingBand
-          activeScenarioId={facts?.activeScenarioId ?? null}
-          scenario={serving}
-          problems={problems}
-        />
+        {mockData ? (
+          <CapabilitySection capability={mockData}>
+            <ServingBand
+              activeScenarioId={facts?.activeScenarioId ?? null}
+              scenario={serving}
+              problems={problems}
+            />
 
-        <MetricStrip metrics={metrics} />
+            <MetricStrip metrics={metrics} />
 
-        <div className={styles.split}>
-          <ActivityPanel
-            entries={log.entries}
-            live={log.live}
-            sampled={log.sampled}
-            error={log.error}
-          />
+            <div className={styles.split}>
+              <ActivityPanel entries={log.entries} live={log.live} sampled={log.sampled} error={log.error} />
 
-          <CoveragePanel
-            services={services.status === 'ready' ? services.data : []}
-            state={services.status}
-            error={services.status === 'error' ? services.error.message : null}
-          />
-        </div>
+              <CoveragePanel
+                services={services.status === 'ready' ? services.data : []}
+                state={services.status}
+                error={services.status === 'error' ? services.error.message : null}
+              />
+            </div>
+          </CapabilitySection>
+        ) : null}
 
-        <RoadmapStrip />
+        {rest.map((capability) => (
+          <CapabilitySection key={capability.id} capability={capability} />
+        ))}
       </div>
     </>
   );
