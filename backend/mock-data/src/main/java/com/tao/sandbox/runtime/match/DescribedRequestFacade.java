@@ -74,16 +74,44 @@ public class DescribedRequestFacade implements RequestFacade {
         return Optional.empty();
     }
 
+    /**
+     * Every field the request carries, nested ones as dotted paths.
+     *
+     * <p>This listed top-level names only, on the reasoning that deeper fields are addressed by an
+     * expression rather than a name. That was wrong in a way that mattered: a key reading {@code
+     * $.customer.id} left {@code customer} as the only name available, and {@code customer} is not
+     * the name of any key — so the one field that decided the answer was reported as ignored. Depth
+     * is now carried on both sides and compared by {@link KeySpec#reads}.
+     *
+     * <p>Arrays are leaves. A key must select exactly one value, so identity is never inside a list,
+     * and descending would add an entry per element to say nothing.
+     */
     @Override
     public List<String> fieldNames() {
         List<String> names = new ArrayList<>(pathVariables.keySet());
         names.addAll(query.keySet());
         if (body != null && body.isObject()) {
-            // Top level only: a key deeper than that is addressed by an expression, not a name, and
-            // listing every leaf of a large payload would bury the ones that matter.
-            body.propertyNames().forEach(names::add);
+            collect(body, "", names, 0);
         }
         return names;
+    }
+
+    /** The same bound the schema walkers use: far past any payload a person reads on screen. */
+    private static final int MAX_DEPTH = 10;
+
+    private void collect(JsonNode node, String prefix, List<String> names, int depth) {
+        for (String property : node.propertyNames()) {
+            String path = prefix.isEmpty() ? property : prefix + "." + property;
+            JsonNode value = node.get(property);
+
+            // An empty object is a leaf: there is nothing inside it to name, and reporting the
+            // container is what tells a reader it arrived at all.
+            if (value != null && value.isObject() && !value.isEmpty() && depth < MAX_DEPTH) {
+                collect(value, path, names, depth + 1);
+            } else {
+                names.add(path);
+            }
+        }
     }
 
     /** The body as supplied, for the trace. */

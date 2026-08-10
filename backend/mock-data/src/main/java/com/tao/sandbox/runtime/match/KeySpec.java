@@ -173,6 +173,97 @@ public record KeySpec(String name, Source source, String expression) {
     }
 
     /**
+     * Whether this key reads the field at {@code path}, or reads something inside it.
+     *
+     * <p>A different question from {@link #matchesName}, which asks whether a string is one of the
+     * spellings of this key. This one is asked of a field a request actually carried, to decide
+     * whether extraction looked at it — and the answer has to account for depth, because a key
+     * reaching {@code $.customer.id} reads the {@code customer} object too. Asking {@code
+     * matchesName} instead reported {@code customer} as ignored, which is the worst answer available:
+     * the reader is consulting the list precisely because they already believe the wrong thing about
+     * which fields matter, and being told the container is ignored confirms it.
+     *
+     * <p>Either direction counts as read. A field shallower than the key is something the key reads
+     * into; a field deeper than it sits inside a value the key selects whole. Only a genuine
+     * divergence — {@code customer.name} against {@code customer.id} — is ignored, which is exactly
+     * the case worth reporting.
+     */
+    public boolean reads(String path) {
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+
+        List<String> mine = fieldPath();
+        List<String> theirs = segmentsOf(path, '.');
+
+        for (int i = 0; i < Math.min(mine.size(), theirs.size()); i++) {
+            if (!mine.get(i).equalsIgnoreCase(theirs.get(i))) {
+                return false;
+            }
+        }
+        return !mine.isEmpty() && !theirs.isEmpty();
+    }
+
+    /**
+     * Where this key reads, as the path segments a request facade enumerates.
+     *
+     * <p>The two vocabularies have to meet somewhere, and this is the seam. A JSON key drops its
+     * {@code $.} root and its array indices; an XPath key drops the envelope scaffolding, because a
+     * facade enumerating an envelope's fields starts below it — at the operation element for a body
+     * field, and at the header's own children for a header one. What remains on both sides is the
+     * path from there down.
+     *
+     * <p>Array indices are dropped rather than kept because a facade does not descend into arrays: a
+     * key must select exactly one value, so identity is never inside a list, and enumerating one
+     * would produce an entry per element for nothing.
+     */
+    public List<String> fieldPath() {
+        return switch (source) {
+            case PATH, QUERY, HEADER -> List.of(expression);
+            case BODY -> segmentsOf(expression.replaceFirst("^\\$\\.?", ""), '.');
+            case XPATH -> belowEnvelope(segmentsOf(expression, '/'));
+        };
+    }
+
+    /**
+     * Everything after the envelope section a facade starts from.
+     *
+     * <p>{@code Body} is followed by the operation element, which is not a field — the fields are its
+     * children — so two segments go. {@code Header} carries its fields directly, so one does. An
+     * expression shaped like neither is left whole rather than guessed at: it will simply not match,
+     * which is the same answer this gave before any of this existed.
+     */
+    private static List<String> belowEnvelope(List<String> segments) {
+        for (int i = 0; i < segments.size(); i++) {
+            if (segments.get(i).equalsIgnoreCase("Body")) {
+                return i + 2 <= segments.size() ? segments.subList(i + 2, segments.size()) : List.of();
+            }
+            if (segments.get(i).equalsIgnoreCase("Header")) {
+                return segments.subList(i + 1, segments.size());
+            }
+        }
+        return segments;
+    }
+
+    /** Split, with the attribute marker, namespace prefixes and array indices taken off each part. */
+    private static List<String> segmentsOf(String expression, char separator) {
+        List<String> segments = new ArrayList<>();
+
+        for (String raw : expression.split(Pattern.quote(String.valueOf(separator)))) {
+            String segment = raw.trim().replace("@", "").replaceAll("\\[[^]]*]", "");
+            int prefix = segment.indexOf(':');
+            if (prefix >= 0) {
+                segment = segment.substring(prefix + 1);
+            }
+            if (!segment.isBlank()) {
+                segments.add(segment);
+            }
+        }
+
+        return segments;
+    }
+
+    /**
      * The name used in filenames and traces.
      *
      * <p>Taken from the leaf of the expression so that a long XPath still produces a short,

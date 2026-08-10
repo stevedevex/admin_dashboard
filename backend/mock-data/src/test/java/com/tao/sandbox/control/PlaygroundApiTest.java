@@ -265,6 +265,40 @@ class PlaygroundApiTest {
         assertThat(entry.get("matched").asString()).endsWith("name=rex.json");
     }
 
+    /**
+     * Nested fields are named to their leaves, not summarised by their container.
+     *
+     * <p>{@code owner} on its own says a field arrived and nothing about which part of it was
+     * expected to matter. Someone who put {@code owner.id} in a request and did not get the mock they
+     * wanted needs to see {@code owner.id} listed, which is the sentence "nothing read that" — and
+     * before this the list could only say "nothing read owner".
+     */
+    @Test
+    void nestedFieldsAreReportedByTheirFullPath() {
+        JsonNode result =
+                send(Map.of(
+                        "method", "POST",
+                        "path", "/petstore/v1/pets",
+                        "body", "{\"name\":\"rex\",\"owner\":{\"id\":\"7\",\"note\":\"vip\"}}"));
+
+        assertThat(result.get("discarded").valueStream().map(JsonNode::asString))
+                .containsExactlyInAnyOrder("owner.id", "owner.note")
+                .as("the key itself is read, so it is never discarded")
+                .doesNotContain("name");
+    }
+
+    /** An array is a leaf: identity is never inside a list, and one entry per element says nothing. */
+    @Test
+    void anArrayIsReportedAsItselfRatherThanPerElement() {
+        JsonNode result =
+                send(Map.of(
+                        "method", "POST",
+                        "path", "/petstore/v1/pets",
+                        "body", "{\"name\":\"rex\",\"tags\":[{\"id\":1},{\"id\":2},{\"id\":3}]}"));
+
+        assertThat(result.get("discarded").valueStream().map(JsonNode::asString)).containsExactly("tags");
+    }
+
     // --- helpers -----------------------------------------------------------
 
     private JsonNode draft(Map<String, String> operation, Map<String, String> keys) {

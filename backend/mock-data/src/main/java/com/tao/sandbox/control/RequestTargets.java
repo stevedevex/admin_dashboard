@@ -3,6 +3,7 @@ package com.tao.sandbox.control;
 import com.tao.sandbox.config.SandboxProperties;
 import com.tao.sandbox.control.view.ResolveRequest;
 import com.tao.sandbox.runtime.match.DescribedRequestFacade;
+import com.tao.sandbox.runtime.match.KeySpec;
 import com.tao.sandbox.runtime.match.RequestFacade;
 import com.tao.sandbox.runtime.resolve.OperationLocator;
 import com.tao.sandbox.runtime.soap.SoapEnvelope;
@@ -99,11 +100,16 @@ class RequestTargets {
      * the field as ignored when it is the one that decided the answer. Saying a field was discarded
      * when it was read is worse than saying nothing — this list is consulted precisely by someone
      * who already believes the wrong thing about which fields matter.
+     *
+     * <p>Which is why the question is {@link KeySpec#reads} rather than {@code matchesName}. An alias
+     * is one way a field and a key can be the same thing under different names; depth is another,
+     * and the more common one. A key reaching {@code $.customer.id} reads {@code customer} as
+     * surely as it reads {@code id}, and a comparison by name alone called the container ignored.
      */
     List<String> discarded(Target target) {
         List<String> discarded = new ArrayList<>();
         for (String field : target.facade().fieldNames()) {
-            boolean read = target.operation().keys().stream().anyMatch(key -> key.matchesName(field));
+            boolean read = target.operation().keys().stream().anyMatch(key -> key.reads(field));
             if (!read && !discarded.contains(field)) {
                 discarded.add(field);
             }

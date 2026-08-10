@@ -75,35 +75,59 @@ public class SoapRequestFacade implements RequestFacade {
         }
     }
 
+    /** The same bound the schema walkers use: far past any envelope a person reads on screen. */
+    private static final int MAX_DEPTH = 10;
+
     /**
-     * The element names the envelope carries, from the header and from the operation's payload.
+     * The fields the envelope carries, from the header and from the operation's payload, nested ones
+     * as dotted paths.
      *
      * <p>Local names without their namespaces, because this is read by a person comparing what they
-     * sent against what was extracted, not by anything that resolves them.
+     * sent against what was extracted, not by anything that resolves them. {@link
+     * KeySpec#fieldPath()} strips prefixes from the other side for the same reason.
+     *
+     * <p>Anchored below the envelope scaffolding — at the operation element for a body field, at the
+     * header's own children for a header one — so {@code …/x:Request/x:Party/x:Id} and the {@code
+     * Party.Id} reported here are the same path written twice.
+     *
+     * <p>This listed one level only, which meant a key reading {@code …/x:Party/x:Id} had {@code
+     * Party} as the only name available, and {@code Party} matched no key — so the field that
+     * decided the answer was reported as ignored.
      */
     @Override
     public List<String> fieldNames() {
         List<String> names = new ArrayList<>();
-        collectChildren(envelope.getElementsByTagNameNS(version.envelopeNamespace(), "Header"), names, false);
-        collectChildren(envelope.getElementsByTagNameNS(version.envelopeNamespace(), "Body"), names, true);
+
+        // A Header's children are the fields themselves; the Body's own child is the operation
+        // element, which is not a field — its children are.
+        for (Element field : sectionChildren("Header")) {
+            collect(field, "", names, 0);
+        }
+        for (Element operation : sectionChildren("Body")) {
+            for (Element field : Dom.elementChildren(operation)) {
+                collect(field, "", names, 0);
+            }
+        }
+
         return names;
     }
 
-    /**
-     * @param descend the Body's own child is the operation element, so its children are the fields;
-     *     a Header's children are the fields themselves
-     */
-    private void collectChildren(NodeList sections, List<String> names, boolean descend) {
-        if (sections.getLength() == 0) {
+    private List<Element> sectionChildren(String localName) {
+        NodeList sections = envelope.getElementsByTagNameNS(version.envelopeNamespace(), localName);
+        return sections.getLength() == 0 ? List.of() : Dom.elementChildren(sections.item(0));
+    }
+
+    private void collect(Element element, String prefix, List<String> names, int depth) {
+        String path = prefix.isEmpty() ? element.getLocalName() : prefix + "." + element.getLocalName();
+        List<Element> children = Dom.elementChildren(element);
+
+        if (children.isEmpty() || depth >= MAX_DEPTH) {
+            names.add(path);
             return;
         }
 
-        for (Element child : Dom.elementChildren(sections.item(0))) {
-            if (descend) {
-                Dom.elementChildren(child).forEach(field -> names.add(field.getLocalName()));
-            } else {
-                names.add(child.getLocalName());
-            }
+        for (Element child : children) {
+            collect(child, path, names, depth + 1);
         }
     }
 

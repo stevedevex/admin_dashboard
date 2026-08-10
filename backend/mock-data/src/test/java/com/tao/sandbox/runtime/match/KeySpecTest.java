@@ -253,4 +253,97 @@ class KeySpecTest {
 
         assertThat(problems).singleElement().asString().contains("both called 'Id'");
     }
+
+    // --- which fields a key reads ------------------------------------------
+
+    /**
+     * The case this method exists for.
+     *
+     * <p>A key reaching into an object reads that object. Comparing by name instead reported {@code
+     * customer} as ignored — and the field that decided the answer being listed as irrelevant is the
+     * worst thing this list can say, because it is read by someone who already suspects the wrong
+     * field.
+     */
+    @Test
+    void aKeyReadsTheObjectItReachesInto() {
+        KeySpec key = KeySpec.parse("body:$.customer.id");
+
+        assertThat(key.reads("customer.id")).isTrue();
+        assertThat(key.reads("customer")).as("the container the key reaches through").isTrue();
+    }
+
+    /** A sibling of the key's field is genuinely ignored, which is the whole point of reporting. */
+    @Test
+    void aSiblingOfTheKeysFieldIsNotRead() {
+        KeySpec key = KeySpec.parse("body:$.customer.id");
+
+        assertThat(key.reads("customer.name")).isFalse();
+        assertThat(key.reads("correlationId")).isFalse();
+    }
+
+    /** A field inside a value the key selects whole is part of what the key read. */
+    @Test
+    void aFieldDeeperThanTheKeyIsRead() {
+        assertThat(KeySpec.parse("body:$.customer").reads("customer.id")).isTrue();
+    }
+
+    /**
+     * An XPath key and an enumerated envelope field are the same path written twice, so the envelope
+     * scaffolding comes off: a facade listing an envelope's fields starts at the operation element.
+     */
+    @Test
+    void anXpathKeyIsReadAgainstThePathBelowTheOperationElement() {
+        KeySpec key = KeySpec.parse("xpath:/soapenv:Envelope/soapenv:Body/x:Request/x:Party/x:Id");
+
+        assertThat(key.fieldPath()).containsExactly("Party", "Id");
+        assertThat(key.reads("Party.Id")).isTrue();
+        assertThat(key.reads("Party")).isTrue();
+        assertThat(key.reads("Party.Name")).isFalse();
+    }
+
+    /** A header field is a child of Header, so only that one segment is scaffolding. */
+    @Test
+    void aHeaderXpathKeyIsReadFromBelowTheHeader() {
+        KeySpec key = KeySpec.parse("xpath:/soapenv:Envelope/soapenv:Header/x:Auth/x:User");
+
+        assertThat(key.fieldPath()).containsExactly("Auth", "User");
+    }
+
+    /** A flat key is its own single-segment path, whatever it is read from. */
+    @Test
+    void flatKeysReadTheFieldTheyName() {
+        assertThat(KeySpec.parse("path:petId").reads("petId")).isTrue();
+        assertThat(KeySpec.parse("query:limit").reads("limit")).isTrue();
+        assertThat(KeySpec.parse("query:limit").reads("offset")).isFalse();
+    }
+
+    /**
+     * An alias renames the key, never the field. Reading is decided on where the key points, so the
+     * field keeps being recognised under the name the schema gave it.
+     */
+    @Test
+    void anAliasDoesNotStopTheFieldBeingRecognised() {
+        KeySpec key = KeySpec.parse("xpath:/soapenv:Envelope/soapenv:Body/b:Request/b:BusinessRelationId as brid");
+
+        assertThat(key.name()).isEqualTo("brid");
+        assertThat(key.reads("BusinessRelationId")).isTrue();
+    }
+
+    /**
+     * Array indices come off both sides. A key must select exactly one value, so identity is never
+     * inside a list and a facade does not descend into one — it reports the array itself.
+     */
+    @Test
+    void arrayIndicesAreNotPartOfTheFieldPath() {
+        KeySpec key = KeySpec.parse("body:$.items[0].id");
+
+        assertThat(key.fieldPath()).containsExactly("items", "id");
+        assertThat(key.reads("items")).isTrue();
+    }
+
+    /** Field names are compared the way filenames are: case is not what distinguishes two fields. */
+    @Test
+    void readingIsCaseInsensitive() {
+        assertThat(KeySpec.parse("body:$.Customer.Id").reads("customer.id")).isTrue();
+    }
 }
