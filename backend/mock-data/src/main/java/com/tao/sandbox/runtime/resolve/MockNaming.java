@@ -124,11 +124,7 @@ public class MockNaming {
 
     private static Optional<String> lookup(Map<String, String> supplied, KeySpec key) {
         for (Map.Entry<String, String> entry : supplied.entrySet()) {
-            String name = entry.getKey();
-            if (name.equalsIgnoreCase(key.name())
-                    || name.equalsIgnoreCase(key.derivedName())
-                    || name.equalsIgnoreCase(key.expression())
-                    || name.equalsIgnoreCase(key.source() + ":" + key.expression())) {
+            if (key.matchesName(entry.getKey())) {
                 return Optional.ofNullable(entry.getValue());
             }
         }

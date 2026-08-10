@@ -142,6 +142,26 @@ public record KeySpec(String name, Source source, String expression) {
     }
 
     /**
+     * Whether a name a caller used means this key.
+     *
+     * <p>Four spellings mean the same field: the key's name, the name it would have had without an
+     * alias, its raw expression, and its whole declaration. {@code GET /__tao/services} reports
+     * several of them, so a caller holding any one is holding this key.
+     *
+     * <p>Asked in two places, and they must agree. The control panel uses it to match supplied key
+     * values against what an operation declares; the dry run uses it to decide which of the fields
+     * a request carried were read and which were ignored. Answering differently would either lose a
+     * caller's value or tell them a field was discarded when it decided the answer.
+     */
+    public boolean matchesName(String candidate) {
+        return candidate != null
+                && (candidate.equalsIgnoreCase(name)
+                        || candidate.equalsIgnoreCase(derivedName())
+                        || candidate.equalsIgnoreCase(expression)
+                        || candidate.equalsIgnoreCase(source + ":" + expression));
+    }
+
+    /**
      * The name this key would have without an alias — the leaf of its expression.
      *
      * <p>Kept reachable because the control panel accepts a key under any spelling that means it,

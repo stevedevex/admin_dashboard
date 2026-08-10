@@ -4,6 +4,7 @@ import com.tao.sandbox.config.SandboxProperties;
 import com.tao.sandbox.control.view.ResolveRequest;
 import com.tao.sandbox.control.view.ResolveResult;
 import com.tao.sandbox.runtime.match.DescribedRequestFacade;
+import com.tao.sandbox.runtime.match.KeySpec;
 import com.tao.sandbox.runtime.match.RequestFacade;
 import com.tao.sandbox.runtime.resolve.ActiveScenario;
 import com.tao.sandbox.runtime.resolve.MockPipeline;
@@ -86,7 +87,7 @@ class ResolveController {
                 trace.operationId(),
                 trace.scenarioId(),
                 new LinkedHashMap<>(trace.extracted()),
-                discarded(attempt.facade(), trace),
+                discarded(attempt.operation(), attempt.facade()),
                 trace.attempted(),
                 trace.matched() == null ? null : trace.matched().asPath(),
                 trace.inherited(),
@@ -209,11 +210,23 @@ class ResolveController {
         return headers;
     }
 
-    /** What the request carried that no declared key reads. */
-    private List<String> discarded(RequestFacade facade, ResolutionTrace trace) {
+    /**
+     * What the request carried that no declared key reads — the correlation ids, timestamps and
+     * optional parameters extraction deliberately ignores. Seeing them listed is what turns "the
+     * mock did not match" into "of course, the key is not what I thought".
+     *
+     * <p>Compared against what the operation <em>declares</em>, not against the names of the values
+     * it extracted. Those are the same thing only until a key is given an alias: read {@code
+     * productPriceInMinorUnits} and call it {@code price}, and comparing by extracted name reports
+     * the field as ignored when it is the one that decided the answer. Saying a field was discarded
+     * when it was read is worse than saying nothing — this list is consulted precisely by someone
+     * who already believes the wrong thing about which fields matter.
+     */
+    private List<String> discarded(ServedOperation operation, RequestFacade facade) {
         List<String> discarded = new ArrayList<>();
         for (String field : facade.fieldNames()) {
-            if (!trace.extracted().containsKey(field) && !discarded.contains(field)) {
+            boolean read = operation.keys().stream().anyMatch(key -> key.matchesName(field));
+            if (!read && !discarded.contains(field)) {
                 discarded.add(field);
             }
         }

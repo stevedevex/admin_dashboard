@@ -159,6 +159,39 @@ class KeySpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> KeySpec.parse(null));
     }
 
+    // --- recognising a key by any name that means it -------------------------
+
+    @Test
+    void aKeyAnswersToItsNameExpressionAndWholeDeclaration() {
+        KeySpec key = KeySpec.parse("body:$.customer.accountId");
+
+        assertThat(key.matchesName("accountId")).isTrue();
+        assertThat(key.matchesName("$.customer.accountId")).isTrue();
+        assertThat(key.matchesName("BODY:$.customer.accountId")).isTrue();
+        assertThat(key.matchesName("ACCOUNTID")).isTrue();
+    }
+
+    /**
+     * An aliased key answers to both, which is what stops the dry run reporting the field it read
+     * as one it discarded — the field is spelled one way and the key is called another.
+     */
+    @Test
+    void anAliasedKeyAnswersToBothItsNames() {
+        KeySpec key = KeySpec.parse("query:productPriceInMinorUnits as price");
+
+        assertThat(key.matchesName("price")).isTrue();
+        assertThat(key.matchesName("productPriceInMinorUnits")).isTrue();
+    }
+
+    @Test
+    void aKeyDoesNotAnswerToSomethingElse() {
+        KeySpec key = KeySpec.parse("query:productPriceInMinorUnits as price");
+
+        assertThat(key.matchesName("correlationId")).isFalse();
+        assertThat(key.matchesName("pric")).isFalse();
+        assertThat(key.matchesName(null)).isFalse();
+    }
+
     // --- parsing a whole operation's keys -----------------------------------
 
     @Test
