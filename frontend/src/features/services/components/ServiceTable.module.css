@@ -45,6 +45,32 @@
   font-size: var(--tao-text-xs);
 }
 
+/* Wrapping rather than one long line: a service declaring several keys is the ordinary case, and
+   a row that scrolls sideways hides the very fields this column exists to show. */
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tao-space-1) var(--tao-space-2);
+}
+
+.key {
+  font-family: var(--tao-font-mono);
+  font-size: var(--tao-text-xs);
+  /* Dotted, not solid: it says "there is more here" without reading as a link. */
+  border-bottom: 1px dotted var(--tao-border-strong);
+  cursor: help;
+}
+
+/*
+ * Shown beside an aliased name, not left to the tooltip.
+ *
+ * `brid` is a name configuration invented; nothing about it says which field it reads, and a
+ * reader scanning this column has no reason to hover over a name they have no reason to doubt.
+ */
+.aliasOf {
+  color: var(--tao-text-muted);
+}
+
 /*
  * Applied to the header as well as the cell, and specific enough to win.
  * `.table th` sets text-align on every header, and a bare `.numeric` loses to it on specificity —

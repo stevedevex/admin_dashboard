@@ -13,7 +13,25 @@ export type KeyField = {
   /** Where it is read from: PATH, QUERY, HEADER, BODY, XPATH. */
   source: string;
   expression: string;
+  /**
+   * The field's own name, when `name` is a short one configuration chose with `as`. Null when the
+   * two are the same.
+   *
+   * An aliased key is the one case where a name explains nothing: `brid` is somebody's
+   * abbreviation, not a word any schema uses, so anywhere the name is shown alone has to be able
+   * to say what it stands for.
+   */
+  aliasOf: string | null;
 };
+
+/**
+ * How much of a request a mock's file name has to account for.
+ *
+ * `ALL` — every declared key. `FIRST_PRESENT` — exactly one, the first with a value.
+ * `BEST_MATCH` — any subset, each file naming the keys that decide it and matching whatever the
+ * rest happen to be.
+ */
+export type KeyStrategy = 'ALL' | 'FIRST_PRESENT' | 'BEST_MATCH';
 
 /** An operation a service serves, and what identifies a request to it. */
 export type Operation = {
@@ -21,6 +39,11 @@ export type Operation = {
   method: string;
   path: string;
   keys: KeyField[];
+  /**
+   * Which of `keys` a file name carries. Needed wherever key values are collected: the same blank
+   * field is an omission under `ALL` and a deliberate wildcard under `BEST_MATCH`.
+   */
+  strategy: KeyStrategy;
 };
 
 /** A mocked upstream endpoint. `protocol` is free-form: the backend names it. */
@@ -31,8 +54,14 @@ export type Service = {
   endpoint: string;
   format: MockFormat;
   hasSchema: boolean;
-  /** Fields the resolver extracts from a request, in priority order. */
-  keyFields: string[];
+  /**
+   * Fields the resolver extracts from a request, in priority order, flattened across operations.
+   *
+   * The whole descriptor rather than the name: a name on its own is enough to render only while
+   * every name is the field's own, and an alias breaks that quietly — the page keeps rendering,
+   * and what it renders stops meaning anything.
+   */
+  keyFields: KeyField[];
   operations: Operation[];
   mockCount: number;
 };

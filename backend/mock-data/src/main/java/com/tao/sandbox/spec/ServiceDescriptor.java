@@ -1,5 +1,6 @@
 package com.tao.sandbox.spec;
 
+import com.tao.sandbox.config.SandboxProperties.KeyStrategy;
 import com.tao.sandbox.config.SandboxProperties.ServiceType;
 import java.util.List;
 
@@ -23,7 +24,12 @@ public record ServiceDescriptor(
     /**
      * @param keys the declared identity fields, so the dashboard can offer them when creating a
      *     mock instead of asking anyone to type a file name
+     * @param strategy how many of those keys a filename carries. Reported because the answer
+     *     changes what an author is being asked for: under {@code ALL} a blank key is an omission,
+     *     under {@code BEST_MATCH} it is the point — the file matches whatever that field happens
+     *     to be. A dashboard that cannot tell them apart can only offer the strictest reading, and
+     *     then a subset mock is something you can drop into the store but not write from here.
      */
     public record OperationSummary(
-            String id, String method, String path, List<KeyDescriptor> keys) {}
+            String id, String method, String path, List<KeyDescriptor> keys, KeyStrategy strategy) {}
 }

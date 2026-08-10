@@ -44,6 +44,15 @@
   word-break: break-all;
 }
 
+/* Sits under the file name because it is a reading of that name, not a second instruction. */
+.reach {
+  margin: 0;
+  padding: 0 var(--tao-space-3) var(--tao-space-3);
+  font-size: var(--tao-text-xs);
+  line-height: 1.5;
+  color: var(--tao-text-muted);
+}
+
 .error {
   font-size: var(--tao-text-xs);
   line-height: 1.5;

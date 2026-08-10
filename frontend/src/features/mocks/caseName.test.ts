@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { KeyField } from '@/api';
 import { caseLabel, describeCase, matchesCase } from './caseName';
 
-const key = (name: string): KeyField => ({ name, source: 'BODY', expression: `//${name}` });
+const key = (name: string): KeyField => ({
+  name,
+  source: 'BODY',
+  expression: `//${name}`,
+  aliasOf: null,
+});
 
 const CALCULATOR = [key('intA'), key('intB')];
 

@@ -1,5 +1,7 @@
 import type {
   AiStatus,
+  KeyField,
+  KeyStrategy,
   MockContent,
   MockDataSummary,
   MockDraft,
@@ -9,6 +11,7 @@ import type {
   MockSummary,
   RequestDetail,
   RequestEntry,
+  Operation,
   OperationSchema,
   PayloadGeneration,
   RequestPage,
@@ -49,9 +52,15 @@ type WireSummary = {
   largestMockBytes: number;
 };
 
-type WireKey = { name: string; source: string; expression: string };
+type WireKey = { name: string; source: string; expression: string; aliasOf: string | null };
 
-type WireOperation = { id: string; method: string; path: string; keys: WireKey[] };
+type WireOperation = {
+  id: string;
+  method: string;
+  path: string;
+  keys: WireKey[];
+  strategy: string;
+};
 
 type WireService = {
   id: string;
@@ -145,6 +154,7 @@ type WireValidation = {
 
 const FORMATS: MockFormat[] = ['xml', 'json', 'text'];
 const STATES: MockState[] = ['valid', 'incomplete', 'invalid', 'unchecked'];
+const STRATEGIES: KeyStrategy[] = ['ALL', 'FIRST_PRESENT', 'BEST_MATCH'];
 
 /** Unknown values fall back rather than throwing: a new server format must not blank the screen. */
 function asFormat(value: string): MockFormat {
@@ -160,7 +170,36 @@ function asChecked(value: string): ValidationResult['checked'] {
   return lowered === 'schema' || lowered === 'syntax' ? lowered : 'none';
 }
 
+/**
+ * The strictest reading is the fallback, on purpose. A strategy this dashboard has not heard of
+ * would otherwise be shown as `ALL` by accident of ordering; treating it as "every key" is the
+ * reading that asks for more than it needs rather than one that quietly writes a file the server
+ * would refuse.
+ */
+function asStrategy(value: string): KeyStrategy {
+  return STRATEGIES.find((strategy) => strategy === value) ?? 'ALL';
+}
+
+function toOperation(wire: WireOperation): Operation {
+  return {
+    id: wire.id,
+    method: wire.method,
+    path: wire.path,
+    keys: wire.keys,
+    strategy: asStrategy(wire.strategy),
+  };
+}
+
 function toService(wire: WireService): Service {
+  const operations = wire.operations.map(toOperation);
+
+  // Flattened across operations, in declaration order: the services page lists what identifies a
+  // request to this service, and the same field named by two operations is one field to a reader.
+  const byName = new Map<string, KeyField>();
+  for (const key of operations.flatMap((operation) => operation.keys)) {
+    if (!byName.has(key.name)) byName.set(key.name, key);
+  }
+
   return {
     id: wire.id,
     name: wire.name,
@@ -168,10 +207,8 @@ function toService(wire: WireService): Service {
     endpoint: wire.endpoint,
     format: asFormat(wire.format),
     hasSchema: wire.hasSchema,
-    // Flattened across operations, in declaration order: the services page lists what identifies a
-    // request to this service, and the same field named by two operations is one field to a reader.
-    keyFields: [...new Set(wire.operations.flatMap((op) => op.keys.map((key) => key.name)))],
-    operations: wire.operations,
+    keyFields: [...byName.values()],
+    operations,
     mockCount: wire.mockCount,
   };
 }
@@ -286,11 +323,7 @@ export const httpTransport: Transport = {
     return wire.map(toMockSummary);
   },
 
-  async nameMock(
-    serviceId: string,
-    operationId: string,
-    keys: Record<string, string>,
-  ): Promise<MockName> {
+  async nameMock(serviceId: string, operationId: string, keys: Record<string, string>): Promise<MockName> {
     return request<WireMockName>('/mocks/name', {
       method: 'POST',
       body: { serviceId, operationId, keys },
@@ -355,9 +388,7 @@ export const httpTransport: Transport = {
 
     // The id travels as a query parameter only when the verdict should stick to the file. Sent for
     // a draft, it would record a judgement about text the store does not hold.
-    const path = options.remember
-      ? `/validate?mockId=${encodeURIComponent(mockId)}`
-      : '/validate';
+    const path = options.remember ? `/validate?mockId=${encodeURIComponent(mockId)}` : '/validate';
 
     const wire = await request<WireValidation>(path, {
       method: 'POST',

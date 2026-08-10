@@ -11,6 +11,7 @@ export type { Transport } from './transport';
 export type {
   AiStatus,
   KeyField,
+  KeyStrategy,
   MockContent,
   MockDataSummary,
   MockDraft,

@@ -106,7 +106,8 @@ public class SpecRegistry {
                                                 op.operationId(),
                                                 op.method().name(),
                                                 op.path(),
-                                                op.keys().stream().map(KeyDescriptor::of).toList()))
+                                                op.keys().stream().map(KeyDescriptor::of).toList(),
+                                                op.strategy()))
                         .toList());
     }
 
@@ -124,7 +125,8 @@ public class SpecRegistry {
                                                 op.operationId(),
                                                 "POST",
                                                 definition.path(),
-                                                op.keys().stream().map(KeyDescriptor::of).toList()))
+                                                op.keys().stream().map(KeyDescriptor::of).toList(),
+                                                op.strategy()))
                         .toList());
     }
 
