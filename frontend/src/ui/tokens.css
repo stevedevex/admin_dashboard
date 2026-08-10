@@ -89,6 +89,16 @@
   --tao-rail-width: 248px;
   --tao-rail-width-collapsed: 64px;
   --tao-header-height: 56px;
+
+  /* --- Source colours --------------------------------------------------
+     Their own group rather than reusing the status colours, which are sized for a tag on a panel
+     and are far too dark to read as text on the dark surface. Syntax is the one place where a
+     colour has to stay legible against `--tao-surface` in both palettes, so both are stated. */
+  --tao-code-name: #1c5b91;
+  --tao-code-string: #2f7a3d;
+  --tao-code-number: #8a4b00;
+  --tao-code-keyword: #7b3fa0;
+  --tao-code-quiet: var(--tao-neutral-500);
 }
 
 :root[data-theme='dark'] {
@@ -111,4 +121,11 @@
   --tao-warn-subtle: #2a2312;
   --tao-error-subtle: #2b1514;
   --tao-info-subtle: #12212c;
+
+  /* Lightened rather than re-hued: the same four meanings, at a luminance that reads on #1f1f1f. */
+  --tao-code-name: #7fb3e0;
+  --tao-code-string: #8ecb96;
+  --tao-code-number: #e0b071;
+  --tao-code-keyword: #c9a0e2;
+  --tao-code-quiet: var(--tao-neutral-400);
 }
