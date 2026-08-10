@@ -4,23 +4,47 @@
   min-height: 0;
   background: var(--tao-surface);
   border: 1px solid var(--tao-border);
-  border-radius: var(--tao-radius-md);
+  border-radius: var(--tao-radius-lg);
+  box-shadow: var(--tao-shadow-md);
 }
 
+/*
+ * A heading with a short accent rule under it, rather than a title bar.
+ *
+ * The bar was a filled strip and a full-width hairline spent on saying "a panel starts here" —
+ * which the panel's own edge already says. The rule marks the same boundary in a fraction of the
+ * ink and is the one place the accent appears at this level, so a page of panels reads as a page
+ * of sections rather than a stack of windows.
+ */
 .header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--tao-space-3);
-  padding: var(--tao-space-3) var(--tao-space-4);
-  border-bottom: 1px solid var(--tao-border);
+  padding: var(--tao-space-3) var(--tao-space-4) 0;
 }
 
 .title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tao-space-2);
   margin: 0;
-  font-size: var(--tao-text-md);
-  font-weight: 600;
+  font-size: var(--tao-text-lg);
+  font-weight: 400;
   color: var(--tao-text);
+}
+
+/* Drawn as a child of the heading so it tracks the text it belongs to, not the panel's width. */
+.title::after {
+  content: '';
+  width: 1.5rem;
+  height: 2px;
+  background: var(--tao-accent);
+}
+
+/* An empty heading still occupies its line and its rule, which reads as a rendering fault. */
+.title:empty {
+  display: none;
 }
 
 .actions {

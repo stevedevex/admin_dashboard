@@ -44,7 +44,7 @@
 }
 
 .subtle:focus-visible {
-  outline: 2px solid var(--tao-accent);
+  outline: 2px solid var(--tao-focus-ring);
   outline-offset: 1px;
 }
 
@@ -103,9 +103,9 @@
 }
 
 .label {
-  font-size: var(--tao-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--tao-label-size);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
   color: var(--tao-text-muted);
 }
 

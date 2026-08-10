@@ -13,7 +13,8 @@
   background: var(--tao-surface);
   border: 1px solid var(--tao-border);
   border-left: 3px solid var(--tao-accent);
-  border-radius: var(--tao-radius-md);
+  border-radius: var(--tao-radius-lg);
+  box-shadow: var(--tao-shadow-md);
 }
 
 .identity {
@@ -22,10 +23,10 @@
 
 .label {
   display: block;
-  font-size: var(--tao-text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: var(--tao-label-size);
+  font-weight: var(--tao-label-weight);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
   color: var(--tao-text-muted);
 }
 
@@ -34,7 +35,7 @@
   margin: var(--tao-space-1) 0 0;
   font-family: var(--tao-font-mono);
   font-size: var(--tao-text-3xl);
-  font-weight: 500;
+  font-weight: var(--tao-weight-display);
   line-height: 1.05;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
@@ -79,7 +80,7 @@
 }
 
 .action:focus-visible {
-  outline: 2px solid var(--tao-accent);
+  outline: 2px solid var(--tao-focus-ring);
   outline-offset: 2px;
   border-radius: var(--tao-radius-sm);
 }

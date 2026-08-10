@@ -8,7 +8,7 @@
 .title {
   margin: 0;
   font-size: var(--tao-text-xl);
-  font-weight: 400;
+  font-weight: var(--tao-weight-display);
   color: var(--tao-text);
   white-space: nowrap;
 }

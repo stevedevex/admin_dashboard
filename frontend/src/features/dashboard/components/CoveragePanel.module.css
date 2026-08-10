@@ -12,7 +12,7 @@
 }
 
 .more:focus-visible {
-  outline: 2px solid var(--tao-accent);
+  outline: 2px solid var(--tao-focus-ring);
   outline-offset: 2px;
   border-radius: var(--tao-radius-sm);
 }

@@ -16,7 +16,9 @@ export function Panel({ title, actions, footer, flush = false, children }: Panel
     <section className={styles.panel}>
       {title || actions ? (
         <header className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
+          {/* Rendered only when there is something to head. The heading draws the accent rule
+              beneath itself, and an empty one draws a rule under nothing. */}
+          {title ? <h2 className={styles.title}>{title}</h2> : null}
           {actions ? <div className={styles.actions}>{actions}</div> : null}
         </header>
       ) : null}

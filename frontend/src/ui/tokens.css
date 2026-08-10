@@ -9,33 +9,41 @@
  */
 
 :root {
-  /* --- Neutrals -------------------------------------------------------- */
+  /* --- Neutrals --------------------------------------------------------
+     Warm rather than achromatic. A pure grey ramp is the one nobody chose — it is what a
+     stylesheet has before anyone decides — and every surface, hairline and muted line of text on
+     every page is drawn from these eleven values, so the bias here is most of what the product
+     looks like. The yellow lean is slight on purpose: enough to read as paper rather than screen,
+     not enough to read as sepia. */
   --tao-neutral-0: #ffffff;
-  --tao-neutral-50: #f7f7f7;
-  --tao-neutral-100: #f0f0f0;
-  --tao-neutral-200: #e3e3e3;
-  --tao-neutral-300: #cfcfcf;
-  --tao-neutral-400: #9e9e9e;
-  --tao-neutral-500: #6e6e6e;
-  --tao-neutral-600: #4a4a4a;
-  --tao-neutral-700: #333333;
-  --tao-neutral-800: #1f1f1f;
-  --tao-neutral-900: #121212;
+  --tao-neutral-50: #faf8f4;
+  --tao-neutral-100: #f3f1ec;
+  --tao-neutral-200: #e4e0d7;
+  --tao-neutral-300: #cfcabd;
+  --tao-neutral-400: #9c988d;
+  --tao-neutral-500: #62605a;
+  --tao-neutral-600: #494742;
+  --tao-neutral-700: #302e2b;
+  --tao-neutral-800: #1f1e1b;
+  --tao-neutral-900: #141311;
 
   /* --- Accent ---------------------------------------------------------- */
   --tao-accent: #d5001c;
   --tao-accent-hover: #b30017;
   --tao-accent-subtle: #fdecee;
 
-  /* --- Status ---------------------------------------------------------- */
-  --tao-ok: #2f7a3d;
-  --tao-ok-subtle: #e8f3ea;
+  /* --- Status ----------------------------------------------------------
+     Semantic, and deliberately not the accent: "this is fine" and "this is the brand" are
+     different statements and must not be made in the same colour. The green leans olive so that
+     it sits on the warm ground rather than on top of it. */
+  --tao-ok: #4f7233;
+  --tao-ok-subtle: #edf1e2;
   --tao-warn: #8a6100;
-  --tao-warn-subtle: #fdf3d8;
+  --tao-warn-subtle: #fbf2da;
   --tao-error: #b3261e;
-  --tao-error-subtle: #fbe9e8;
-  --tao-info: #1c5b91;
-  --tao-info-subtle: #e7f0f7;
+  --tao-error-subtle: #fbe9e6;
+  --tao-info: #2a5f80;
+  --tao-info-subtle: #e9f0f4;
 
   /* --- Solid fills ------------------------------------------------------ */
   /* A high-contrast fill and a quiet chip. Both are semantic rather than palette entries
@@ -71,6 +79,25 @@
   --tao-text-2xl: 1.75rem;
   --tao-text-3xl: 2.75rem;
 
+  /* Headline figures and page titles are set light. At display sizes weight carries no extra
+     information — the size already says "this is the important number" — and a bold one only
+     shouts. Below `xl` this reverses, which is why it is a token for the display sizes and not a
+     global default. */
+  --tao-weight-display: 300;
+
+  /* --- Labels -----------------------------------------------------------
+     The recipe for the small grey word above a value — every column head, tile label and section
+     caption in the application. It was written out five properties at a time in fourteen
+     stylesheets, which is how they drifted to four different letter-spacings.
+
+     Sentence case, not upper. Uppercase with tracking is the reflex of an admin console rather
+     than a decision, it costs a reader the word-shape they recognise, and at 11px it is the least
+     legible thing on the page. */
+  --tao-label-size: var(--tao-text-xs);
+  --tao-label-weight: 500;
+  --tao-label-transform: none;
+  --tao-label-spacing: 0.01em;
+
   /* --- Space ----------------------------------------------------------- */
   --tao-space-1: 0.25rem;
   --tao-space-2: 0.5rem;
@@ -79,11 +106,26 @@
   --tao-space-5: 1.5rem;
   --tao-space-6: 2rem;
 
-  /* --- Shape ----------------------------------------------------------- */
+  /* --- Shape -----------------------------------------------------------
+     Three radii, and which one to use is a question of size: controls stay tight so they read as
+     mechanical, cards are softer so they read as surfaces. */
   --tao-radius-sm: 2px;
   --tao-radius-md: 4px;
-  --tao-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
-  --tao-shadow-md: 0 2px 8px rgb(0 0 0 / 10%);
+  --tao-radius-lg: 6px;
+
+  /* Two shadows in one, which is what makes an edge look lifted rather than blurred: a wide
+     ambient one for the volume, a tight key one for the contact. Tinted with the neutral's own
+     warmth — a black shadow over a warm surface greys it. */
+  --tao-shadow-sm: 0 1px 2px rgb(28 24 18 / 5%);
+  --tao-shadow-md: 0 6px 14px rgb(28 24 18 / 7%), 0 1px 2px rgb(28 24 18 / 5%);
+
+  /* --- Focus ------------------------------------------------------------
+     Its own colour, not the accent. The accent already means "in force" on this page — a rail
+     marker, a keyline, a primary button — and a focus ring in the same red is one more red to
+     tell apart at exactly the moment somebody is navigating by keyboard and cannot see a cursor.
+     The gap is drawn in the page's own ground so the ring separates from whatever it surrounds. */
+  --tao-focus-ring: #2f6f9e;
+  --tao-focus-gap: var(--tao-surface);
 
   /* --- Layout ---------------------------------------------------------- */
   --tao-rail-width: 248px;
@@ -104,9 +146,9 @@
 :root[data-theme='dark'] {
   --tao-bg: var(--tao-neutral-900);
   --tao-surface: var(--tao-neutral-800);
-  --tao-surface-sunken: #171717;
-  --tao-border: #2e2e2e;
-  --tao-border-strong: #3d3d3d;
+  --tao-surface-sunken: #161512;
+  --tao-border: #302e29;
+  --tao-border-strong: #423f38;
   --tao-text: var(--tao-neutral-100);
   --tao-text-muted: var(--tao-neutral-400);
   --tao-text-inverse: var(--tao-neutral-900);
@@ -114,13 +156,29 @@
   --tao-solid: var(--tao-neutral-100);
   --tao-solid-hover: var(--tao-neutral-0);
   --tao-solid-text: var(--tao-neutral-900);
-  --tao-chip: #2e2e2e;
+  --tao-chip: #302e29;
+
+  /*
+   * The status colours were never restated here, so the light palette's values — chosen to sit on
+   * white — were being read on a near-black surface at around 3:1. Lightened to the same four
+   * meanings rather than re-hued.
+   */
+  --tao-ok: #97c06e;
+  --tao-warn: #d5a63f;
+  --tao-error: #e4796d;
+  --tao-info: #7cb0d2;
 
   --tao-accent-subtle: #2a1013;
-  --tao-ok-subtle: #16241a;
+  --tao-ok-subtle: #1d2413;
   --tao-warn-subtle: #2a2312;
   --tao-error-subtle: #2b1514;
   --tao-info-subtle: #12212c;
+
+  /* Lifted off a dark ground by a darker shadow, which is the only direction that reads. */
+  --tao-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --tao-shadow-md: 0 6px 14px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 30%);
+
+  --tao-focus-ring: #7cb0d2;
 
   /* Lightened rather than re-hued: the same four meanings, at a luminance that reads on #1f1f1f. */
   --tao-code-name: #7fb3e0;

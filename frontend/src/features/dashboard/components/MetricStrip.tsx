@@ -26,7 +26,16 @@ export function MetricStrip({ metrics }: { metrics: Metric[] }) {
       {metrics.map((metric) => {
         const body = (
           <>
-            <span className={styles.label}>{metric.label}</span>
+            <span className={styles.head}>
+              <span className={styles.label}>{metric.label}</span>
+              {/* Only where there is somewhere to go. These tiles were already links and looked
+                  exactly like the ones that are not, so the only way to find out was to click. */}
+              {metric.to ? (
+                <span className={styles.chevron} aria-hidden="true">
+                  ›
+                </span>
+              ) : null}
+            </span>
             <span className={styles.value}>{metric.value}</span>
             <span className={metric.attention ? styles.noteAttention : styles.note}>
               {/* Held even when empty, so tiles with a note do not sit taller than those without. */}

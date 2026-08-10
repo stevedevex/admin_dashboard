@@ -43,10 +43,10 @@
   align-items: center;
   gap: var(--tao-space-2);
   margin: 0 0 var(--tao-space-2);
-  font-size: var(--tao-text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--tao-label-size);
+  font-weight: var(--tao-label-weight);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
   color: var(--tao-text-muted);
 }
 

@@ -6,9 +6,9 @@
 }
 
 .targetLabel {
-  font-size: var(--tao-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--tao-label-size);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
   color: var(--tao-text-muted);
 }
 

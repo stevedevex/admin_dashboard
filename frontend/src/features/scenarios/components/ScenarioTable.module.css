@@ -7,10 +7,10 @@
 .table th {
   padding: var(--tao-space-2) var(--tao-space-4);
   text-align: left;
-  font-size: var(--tao-text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--tao-label-size);
+  font-weight: var(--tao-label-weight);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
   color: var(--tao-text-muted);
   background: var(--tao-surface-sunken);
   border-bottom: 1px solid var(--tao-border);

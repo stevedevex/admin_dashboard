@@ -3,8 +3,9 @@
   flex-wrap: wrap;
   margin-bottom: var(--tao-space-5);
   border: 1px solid var(--tao-border);
-  border-radius: var(--tao-radius-md);
+  border-radius: var(--tao-radius-lg);
   background: var(--tao-surface);
+  box-shadow: var(--tao-shadow-md);
   overflow: hidden;
 }
 
@@ -19,16 +20,16 @@
 
 .label {
   margin: 0;
-  font-size: var(--tao-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--tao-label-size);
+  text-transform: var(--tao-label-transform);
+  letter-spacing: var(--tao-label-spacing);
   color: var(--tao-text-muted);
 }
 
 .value {
   margin: var(--tao-space-1) 0 0;
   font-size: var(--tao-text-xl);
-  font-weight: 600;
+  font-weight: var(--tao-weight-display);
   color: var(--tao-text);
 }
 
