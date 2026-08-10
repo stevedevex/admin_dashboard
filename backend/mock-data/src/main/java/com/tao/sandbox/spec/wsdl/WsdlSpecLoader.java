@@ -87,14 +87,8 @@ public class WsdlSpecLoader {
                 continue;
             }
 
-            List<KeySpec> keys = new ArrayList<>();
-            for (String declaration : configured.keys()) {
-                try {
-                    keys.add(KeySpec.parse(declaration));
-                } catch (IllegalArgumentException e) {
-                    problems.add("%s/%s: %s".formatted(service.id(), name, e.getMessage()));
-                }
-            }
+            List<KeySpec> keys =
+                    KeySpec.parseAll(configured.keys(), "%s/%s".formatted(service.id(), name), problems);
 
             served.put(
                     name,

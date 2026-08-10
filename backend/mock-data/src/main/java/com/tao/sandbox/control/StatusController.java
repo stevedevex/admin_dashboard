@@ -8,6 +8,7 @@ import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockRepository;
 import com.tao.sandbox.store.MockSummary;
 import com.tao.sandbox.store.Scenario;
+import com.tao.sandbox.validate.MockReachability;
 import com.tao.sandbox.validate.MockStates;
 import com.tao.sandbox.validate.MockValidationSweep;
 import java.util.List;
@@ -33,6 +34,7 @@ class StatusController {
     private final SpecRegistry registry;
     private final ActiveScenario activeScenario;
     private final MockStates states;
+    private final MockReachability reachability;
     private final MockValidationSweep sweep;
 
     StatusController(
@@ -41,12 +43,14 @@ class StatusController {
             SpecRegistry registry,
             ActiveScenario activeScenario,
             MockStates states,
+            MockReachability reachability,
             MockValidationSweep sweep) {
         this.properties = properties;
         this.repository = repository;
         this.registry = registry;
         this.activeScenario = activeScenario;
         this.states = states;
+        this.reachability = reachability;
         this.sweep = sweep;
     }
 
@@ -65,6 +69,7 @@ class StatusController {
         int invalid = 0;
         int incomplete = 0;
         int unchecked = 0;
+        int unreachable = 0;
         long largest = 0;
 
         for (Scenario scenario : repository.scenarios()) {
@@ -74,6 +79,12 @@ class StatusController {
                 }
                 mockCount++;
                 largest = Math.max(largest, mock.sizeBytes());
+
+                if (!reachability.of(mock.id()).reachable()) {
+                    // Counted apart from the validation buckets: a mock can be flawless in shape
+                    // and still sit at an address nothing computes.
+                    unreachable++;
+                }
 
                 switch (states.get(mock.id()).state()) {
                     case INVALID -> invalid++;
@@ -94,6 +105,7 @@ class StatusController {
                 invalid,
                 incomplete,
                 unchecked,
+                unreachable,
                 largest);
     }
 

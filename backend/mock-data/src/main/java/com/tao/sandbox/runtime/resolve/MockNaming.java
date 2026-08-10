@@ -4,7 +4,7 @@ import com.tao.sandbox.runtime.match.KeySpec;
 import com.tao.sandbox.runtime.match.Normaliser;
 import com.tao.sandbox.spec.ServedOperation;
 import com.tao.sandbox.spec.SpecRegistry;
-import com.tao.sandbox.store.MockQuery;
+import com.tao.sandbox.store.MockStem;
 import com.tao.sandbox.store.MockRepository;
 import com.tao.sandbox.store.Payloads;
 import java.util.LinkedHashMap;
@@ -53,9 +53,7 @@ public class MockNaming {
      * specific matches, which is a mock an author legitimately wants to write.
      */
     public static String stemFor(String serviceId, String operationId, SequencedMap<String, String> keys) {
-        return keys.isEmpty()
-                ? MockRepository.DEFAULT_STEM
-                : new MockQuery(null, serviceId, operationId, keys).keySignature();
+        return keys.isEmpty() ? MockRepository.DEFAULT_STEM : MockStem.of(keys);
     }
 
     /** Stem and extension together — the name a mock is actually saved under. */
@@ -83,10 +81,12 @@ public class MockNaming {
      * Matches caller-supplied key values against what the operation declares, normalising each and
      * keeping declaration order.
      *
-     * <p>Values arrive loosely named — {@code GET /__tao/services} reports a key's derived name,
-     * its raw expression and its full declaration, and a caller holding any of the three means the
-     * same field. Being strict would convert a reasonable choice into an empty key set, which
-     * names the operation's default: a wrong answer wearing the shape of a right one.
+     * <p>Values arrive loosely named — {@code GET /__tao/services} reports a key's name, its raw
+     * expression and its full declaration, and a caller holding any of them means the same field.
+     * An aliased key has one spelling more: the name its schema uses, which is what somebody
+     * writing a request by hand is most likely to reach for. Being strict would convert a
+     * reasonable choice into an empty key set, which names the operation's default — a wrong
+     * answer wearing the shape of a right one.
      */
     public static SequencedMap<String, String> resolveKeys(
             ServedOperation operation, Map<String, String> supplied) {
@@ -113,8 +113,8 @@ public class MockNaming {
     }
 
     /**
-     * The keys as they appear in the filename — lowercased, exactly as {@link
-     * MockQuery#keySignature} writes them, so a caller can see what its values became.
+     * The keys as they appear in the filename — lowercased, exactly as {@link MockStem#of}
+     * writes them, so a caller can see what its values became.
      */
     public static SequencedMap<String, String> asWritten(SequencedMap<String, String> keys) {
         SequencedMap<String, String> written = new LinkedHashMap<>();
@@ -126,6 +126,7 @@ public class MockNaming {
         for (Map.Entry<String, String> entry : supplied.entrySet()) {
             String name = entry.getKey();
             if (name.equalsIgnoreCase(key.name())
+                    || name.equalsIgnoreCase(key.derivedName())
                     || name.equalsIgnoreCase(key.expression())
                     || name.equalsIgnoreCase(key.source() + ":" + key.expression())) {
                 return Optional.ofNullable(entry.getValue());

@@ -111,6 +111,31 @@ class MockNamingTest {
         assertThat(MockNaming.satisfies(operation, keys("region", "eu"))).isFalse();
     }
 
+    /**
+     * Under best-match a subset is the point, so naming one must not be refused — that refusal is
+     * exactly what made the case inexpressible before.
+     */
+    @Test
+    void underBestMatchAnySubsetMayBeNamed() {
+        ServedOperation operation =
+                operation(KeyStrategy.BEST_MATCH, "query:id", "query:name", "query:category", "query:price");
+
+        assertThat(MockNaming.satisfies(operation, keys("name", "laptop", "category", "electronics"))).isTrue();
+        assertThat(MockNaming.satisfies(operation, keys("id", "1001"))).isTrue();
+        assertThat(MockNaming.satisfies(operation, keys())).isTrue();
+    }
+
+    /** Nothing is skipped after the first present key, because every one of them may be named. */
+    @Test
+    void underBestMatchEverySuppliedKeyIsKept() {
+        SequencedMap<String, String> resolved =
+                MockNaming.resolveKeys(
+                        operation(KeyStrategy.BEST_MATCH, "query:name", "query:category"),
+                        Map.of("name", "Laptop", "category", "Electronics"));
+
+        assertThat(resolved).containsExactly(Map.entry("name", "Laptop"), Map.entry("category", "Electronics"));
+    }
+
     @Test
     void underFirstPresentOneKeyIsEnough() {
         ServedOperation operation = operation(KeyStrategy.FIRST_PRESENT, "query:orderId", "query:reference");

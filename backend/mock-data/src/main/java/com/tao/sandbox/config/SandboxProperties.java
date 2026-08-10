@@ -129,7 +129,27 @@ public record SandboxProperties(
         /** Every declared key must be present, and all take part in the lookup. */
         ALL,
         /** Take the first key present, in declaration order. */
-        FIRST_PRESENT;
+        FIRST_PRESENT,
+        /**
+         * Read every declared key that is present, and let each mock file say which of them it
+         * matches on.
+         *
+         * <p>{@link #ALL} makes a filename carry every declared key, and {@link #FIRST_PRESENT}
+         * makes it carry exactly one. Neither can express the ordinary case: a call sends id, name,
+         * category and price, and the mock that should answer it is the one written for <em>name
+         * and category</em>, whatever the other two happen to be.
+         *
+         * <p>So the filename becomes the declaration. A file is eligible when every {@code
+         * key=value} in its name matches what the request carried; among the eligible, the one
+         * naming the most keys wins, and {@code _default} — naming none — is simply the least
+         * specific of them rather than a special case.
+         *
+         * <p>The cost is that specificity is implicit: whether {@code name=laptop.xml} answers now
+         * depends on what sits beside it. That is why the resolution trace lists every file
+         * considered in the order they were tried, and why an unreachable or ambiguous name is
+         * reported rather than left to be discovered from a wrong response.
+         */
+        BEST_MATCH;
 
         /**
          * Whether the keys found identify a specific mock, or the request falls through to the
@@ -143,12 +163,20 @@ public record SandboxProperties(
             return switch (this) {
                 case ALL -> found == declared;
                 case FIRST_PRESENT -> found > 0;
+                // Any subset identifies something, including none of them: the keys are carried
+                // through and the stored files decide which of them mattered.
+                case BEST_MATCH -> true;
             };
         }
 
         /** Declaration order is the tie-break, so nothing past the first present key is read. */
         public boolean takesFirstOnly() {
             return this == FIRST_PRESENT;
+        }
+
+        /** Whether a stored file may name fewer keys than the request carried. */
+        public boolean matchesSubsets() {
+            return this == BEST_MATCH;
         }
     }
 }

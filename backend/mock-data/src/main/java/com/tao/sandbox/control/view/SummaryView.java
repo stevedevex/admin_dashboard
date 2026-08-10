@@ -15,6 +15,9 @@ package com.tao.sandbox.control.view;
  *     that means "nobody has looked" must not be reported the same way as one that means "we
  *     looked and found none". Sending the denominator is the server's job for the same reason
  *     sending the counts is: the dashboard cannot derive it without listing the whole library.
+ * @param unreachableCount mocks whose name no request produces. Counted apart from the validation
+ *     buckets because it is a different kind of wrong: those describe a payload, this describes an
+ *     address, and a mock can be flawless on one and hopeless on the other.
  */
 public record SummaryView(
         int serviceCount,
@@ -25,4 +28,5 @@ public record SummaryView(
         int invalidCount,
         int incompleteCount,
         int uncheckedCount,
+        int unreachableCount,
         long largestMockBytes) {}

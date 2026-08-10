@@ -5,6 +5,7 @@ import com.tao.sandbox.store.MockDocument;
 import com.tao.sandbox.store.MockId;
 import com.tao.sandbox.store.MockQuery;
 import com.tao.sandbox.store.MockRepository;
+import com.tao.sandbox.store.MockStem;
 import com.tao.sandbox.store.MockSummary;
 import com.tao.sandbox.store.Scenario;
 import jakarta.annotation.PostConstruct;
@@ -19,8 +20,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -77,6 +80,18 @@ public class FilesystemMockRepository implements MockRepository {
      */
     private volatile Map<String, List<String>> chains = new ConcurrentHashMap<>();
 
+    /**
+     * Every stored name for one operation, with its {@code key=value} pairs already read back.
+     *
+     * <p>Keyed by {@code scenario/service/operation}, because subset matching asks "what names
+     * exist here" — a question the by-address index cannot answer without scanning the whole
+     * library, which is the one thing the resolve path may not do.
+     *
+     * <p>Names that are not {@code key=value} shaped are left out. They can never be produced from
+     * a request, so they are not candidates; {@code MockReachability} is what tells their author so.
+     */
+    private final Map<String, Map<String, SequencedMap<String, String>>> stems = new ConcurrentHashMap<>();
+
     /** One mock held whole: payload, sidecars, and the metadata browsing shows. */
     private record CachedMock(MockId id, MockDocument document, long sizeBytes, Instant modifiedAt) {}
 
@@ -89,6 +104,7 @@ public class FilesystemMockRepository implements MockRepository {
     public void reload() {
         Map<String, Scenario> loadedScenarios = new ConcurrentHashMap<>();
         Map<String, CachedMock> loadedMocks = new ConcurrentHashMap<>();
+        stems.clear();
 
         Path scenarioRoot = root.resolve("scenarios");
         if (!Files.isDirectory(scenarioRoot)) {
@@ -220,6 +236,7 @@ public class FilesystemMockRepository implements MockRepository {
 
         CachedMock cached = load(id, path);
         mocks.put(keyFor(id), cached);
+        indexStem(id);
         return summarise(id.scenarioId(), cached);
     }
 
@@ -237,6 +254,7 @@ public class FilesystemMockRepository implements MockRepository {
         }
 
         mocks.remove(keyFor(id));
+        forgetStem(id);
     }
 
     @Override
@@ -316,6 +334,7 @@ public class FilesystemMockRepository implements MockRepository {
         scenarios.remove(id);
         this.chains = chainsFor(scenarios);
         mocks.keySet().removeIf(key -> key.startsWith(id + "/"));
+        stems.keySet().removeIf(key -> key.startsWith(id + "/"));
     }
 
     @Override
@@ -347,7 +366,9 @@ public class FilesystemMockRepository implements MockRepository {
                                 relative.getName(0).toString(),
                                 relative.getName(1).toString(),
                                 fileName);
-                into.putIfAbsent(keyFor(id), load(id, path));
+                if (into.putIfAbsent(keyFor(id), load(id, path)) == null) {
+                    indexStem(id);
+                }
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read " + scenarioDirectory, e);
@@ -381,6 +402,31 @@ public class FilesystemMockRepository implements MockRepository {
 
     private static String keyFor(MockId id) {
         return key(id.scenarioId(), id.serviceId(), id.operationId(), stripExtension(id.fileName()));
+    }
+
+    private static String operationKey(String scenarioId, String serviceId, String operationId) {
+        return scenarioId + "/" + serviceId + "/" + operationId;
+    }
+
+    private static String operationKeyFor(MockId id) {
+        return operationKey(id.scenarioId(), id.serviceId(), id.operationId());
+    }
+
+    /** Records a stored name against its operation, if it is one a request could produce. */
+    private void indexStem(MockId id) {
+        String stem = stripExtension(id.fileName());
+        MockStem.parse(stem)
+                .ifPresent(
+                        pairs ->
+                                stems.computeIfAbsent(operationKeyFor(id), key -> new ConcurrentHashMap<>())
+                                        .put(stem, pairs));
+    }
+
+    private void forgetStem(MockId id) {
+        Map<String, SequencedMap<String, String>> forOperation = stems.get(operationKeyFor(id));
+        if (forOperation != null) {
+            forOperation.remove(stripExtension(id.fileName()));
+        }
     }
 
     // --- internals ----------------------------------------------------------
@@ -435,8 +481,90 @@ public class FilesystemMockRepository implements MockRepository {
 
     /** Filename stems, most specific first. */
     private List<String> fileNames(MockQuery query) {
+        if (query.matching() == MockQuery.Matching.BEST) {
+            return bestMatchStems(query);
+        }
+
         String signature = query.keySignature();
         return signature.isEmpty() ? List.of(DEFAULT_STEM) : List.of(signature, DEFAULT_STEM);
+    }
+
+    /**
+     * Every stored name this request satisfies, most specific first.
+     *
+     * <p>The naive reading of subset matching generates every combination of the extracted keys and
+     * probes each, which is 2^n lookups and unusable past a handful of keys. This asks the inverse
+     * question — of the names that <em>exist</em> for this operation, which does the request
+     * satisfy — so the work is bounded by what an author actually wrote, and stays a few map reads
+     * with no file I/O.
+     *
+     * <p>Ordering, in three tiers. Most keys named wins, because that is what specificity means.
+     * Ties go to the file whose keys come first in declaration order, the same rule {@code
+     * FIRST_PRESENT} uses, so the outcome is deterministic rather than dependent on how a directory
+     * happened to be listed. The stem itself breaks anything still level.
+     */
+    private List<String> bestMatchStems(MockQuery query) {
+        // Lowercased once: stored names are, and the extracted values have not been.
+        Map<String, String> carried = new LinkedHashMap<>();
+        query.keys().forEach((key, value) -> carried.put(lower(key), lower(value)));
+
+        List<String> declarationOrder = List.copyOf(carried.keySet());
+
+        Map<String, SequencedMap<String, String>> eligible = new LinkedHashMap<>();
+        for (String scenarioId : chain(query.scenarioId())) {
+            stems.getOrDefault(operationKey(scenarioId, query.serviceId(), query.operationId()), Map.of())
+                    .forEach(
+                            (stem, pairs) -> {
+                                if (satisfiedBy(pairs, carried)) {
+                                    // The nearest scenario's copy is seen first; the pairs are the
+                                    // same either way, since they are read from the name.
+                                    eligible.putIfAbsent(stem, pairs);
+                                }
+                            });
+        }
+
+        List<String> ranked = new ArrayList<>(eligible.keySet());
+        ranked.sort(
+                Comparator.<String>comparingInt(stem -> -eligible.get(stem).size())
+                        .thenComparing(stem -> positionsOf(eligible.get(stem), declarationOrder), FilesystemMockRepository::compare)
+                        .thenComparing(Comparator.naturalOrder()));
+
+        // Always tried last, and always listed: a miss diagnostic that omitted it would not name
+        // the file an author most often wants to create.
+        if (!ranked.contains(DEFAULT_STEM)) {
+            ranked.add(DEFAULT_STEM);
+        }
+
+        return List.copyOf(ranked);
+    }
+
+    /** Every {@code key=value} the name declares is what the request carried. */
+    private static boolean satisfiedBy(SequencedMap<String, String> pairs, Map<String, String> carried) {
+        for (Map.Entry<String, String> pair : pairs.entrySet()) {
+            if (!pair.getValue().equals(carried.get(pair.getKey()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Where a name's keys sit in the order the operation declared them. */
+    private static List<Integer> positionsOf(SequencedMap<String, String> pairs, List<String> declarationOrder) {
+        return pairs.keySet().stream().map(declarationOrder::indexOf).sorted().toList();
+    }
+
+    private static int compare(List<Integer> left, List<Integer> right) {
+        for (int i = 0; i < Math.min(left.size(), right.size()); i++) {
+            int difference = Integer.compare(left.get(i), right.get(i));
+            if (difference != 0) {
+                return difference;
+            }
+        }
+        return Integer.compare(left.size(), right.size());
+    }
+
+    private static String lower(String value) {
+        return value == null ? null : value.toLowerCase(Locale.ROOT);
     }
 
     private Path pathFor(String scenarioId, String serviceId, String operationId, String fileName) {

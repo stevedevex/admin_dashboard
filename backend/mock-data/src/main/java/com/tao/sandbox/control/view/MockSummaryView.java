@@ -12,6 +12,10 @@ import java.time.Instant;
  *     ancestor of the one that was asked for
  * @param state one of {@code valid}, {@code incomplete}, {@code invalid}, {@code unchecked}
  * @param completeness percentage of schema-declared fields populated, or null when unknown
+ * @param reachable whether any request could produce this file's name. False is not a broken
+ *     payload — it is a file at an address nothing computes, so it never wins and the operation's
+ *     default answers in its place. Silent everywhere else, hence reported here.
+ * @param unreachableReason why, in words the author can act on; null when reachable
  */
 public record MockSummaryView(
         String id,
@@ -25,4 +29,6 @@ public record MockSummaryView(
         boolean inherited,
         String inheritedFrom,
         String state,
-        Integer completeness) {}
+        Integer completeness,
+        boolean reachable,
+        String unreachableReason) {}

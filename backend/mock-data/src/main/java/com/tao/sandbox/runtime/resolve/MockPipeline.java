@@ -52,7 +52,10 @@ public class MockPipeline {
                         scenarioId,
                         operation.serviceId(),
                         operation.operationId(),
-                        extraction.satisfied() ? extraction.keys() : new LinkedHashMap<>());
+                        extraction.satisfied() ? extraction.keys() : new LinkedHashMap<>(),
+                        operation.strategy().matchesSubsets()
+                                ? MockQuery.Matching.BEST
+                                : MockQuery.Matching.EXACT);
 
         Optional<MockProvider.Resolved> resolved = provider.resolve(query);
 

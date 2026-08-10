@@ -90,7 +90,9 @@ public class OpenApiSpecLoader {
                 continue;
             }
 
-            List<KeySpec> keys = parseKeys(service, configured, problems);
+            List<KeySpec> keys =
+                    KeySpec.parseAll(
+                            configured.keys(), "%s/%s".formatted(service.id(), configured.name()), problems);
             Success success = declaredSuccess(document, located.operation());
 
             if (success.schema() != null) {
@@ -148,18 +150,6 @@ public class OpenApiSpecLoader {
      */
     private String stripClasspathPrefix(String location) {
         return location.startsWith("classpath:") ? location.substring("classpath:".length()) : location;
-    }
-
-    private List<KeySpec> parseKeys(ServiceConfig service, OperationConfig configured, List<String> problems) {
-        List<KeySpec> keys = new ArrayList<>();
-        for (String declaration : configured.keys()) {
-            try {
-                keys.add(KeySpec.parse(declaration));
-            } catch (IllegalArgumentException e) {
-                problems.add("%s/%s: %s".formatted(service.id(), configured.name(), e.getMessage()));
-            }
-        }
-        return keys;
     }
 
     private Map<String, Located> indexByOperationId(OpenAPI document) {

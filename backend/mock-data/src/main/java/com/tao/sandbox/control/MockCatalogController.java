@@ -17,9 +17,11 @@ import com.tao.sandbox.store.MockDocument;
 import com.tao.sandbox.store.MockId;
 import com.tao.sandbox.store.MockMeta;
 import com.tao.sandbox.store.MockRepository;
+import com.tao.sandbox.store.MockStem;
 import com.tao.sandbox.store.MockSummary;
 import com.tao.sandbox.store.Payloads;
 import com.tao.sandbox.store.Scenario;
+import com.tao.sandbox.validate.MockReachability;
 import com.tao.sandbox.validate.MockStates;
 import com.tao.sandbox.validate.MockValidator;
 import java.util.List;
@@ -51,6 +53,7 @@ class MockCatalogController {
     private final MockNaming naming;
     private final MockStates states;
     private final MockValidator validator;
+    private final MockReachability reachability;
 
     MockCatalogController(
             MockRepository repository,
@@ -58,13 +61,15 @@ class MockCatalogController {
             ActiveScenario activeScenario,
             MockNaming naming,
             MockStates states,
-            MockValidator validator) {
+            MockValidator validator,
+            MockReachability reachability) {
         this.repository = repository;
         this.registry = registry;
         this.activeScenario = activeScenario;
         this.naming = naming;
         this.states = states;
         this.validator = validator;
+        this.reachability = reachability;
     }
 
     /**
@@ -135,6 +140,16 @@ class MockCatalogController {
             throw ControlPanelProblem.badRequest(
                     "missing-body", "Missing body", "A mock needs a payload. Send an empty string for an empty one.");
         }
+
+        // Checked on the way in, so the failure names the limit rather than arriving later as an
+        // IOException from the filesystem — or, worse, succeeding here and failing on a colleague's
+        // checkout, where the path around the name is longer.
+        MockStem.problemWithLength(mockId.fileName())
+                .ifPresent(
+                        problem -> {
+                            throw ControlPanelProblem.unprocessable(
+                                    "name-too-long", "That name will not fit", problem);
+                        });
 
         Optional<MockDocument> existing = repository.get(mockId);
         MockEtags.requireFreshness(mockId, existing.orElse(null), ifMatch);
@@ -250,9 +265,26 @@ class MockCatalogController {
                             + "supply every key, or none for the operation's default mock.");
         }
 
-        return new MockName(
-                naming.fileNameFor(operation.serviceId(), operation.operationId(), resolved),
-                MockNaming.asWritten(resolved));
+        // Refused rather than escaped. Escaping would be the thorough fix and would rename every
+        // file already on disk; a value carrying a separator is rare, and saying so plainly costs
+        // an author one rename while silently mis-parsing costs them an afternoon.
+        MockStem.problemWith(resolved)
+                .ifPresent(
+                        problem -> {
+                            throw ControlPanelProblem.unprocessable(
+                                    "unusable-key-value", "Cannot name a mock from that", problem);
+                        });
+
+        String fileName = naming.fileNameFor(operation.serviceId(), operation.operationId(), resolved);
+
+        MockStem.problemWithLength(fileName)
+                .ifPresent(
+                        problem -> {
+                            throw ControlPanelProblem.unprocessable(
+                                    "name-too-long", "That name will not fit", problem);
+                        });
+
+        return new MockName(fileName, MockNaming.asWritten(resolved));
     }
 
     // --- internals ---------------------------------------------------------
@@ -275,6 +307,7 @@ class MockCatalogController {
     private MockSummaryView describe(MockSummary summary) {
         MockId id = summary.id();
         MockStates.Assessment assessment = states.get(id);
+        MockReachability.Verdict reach = reachability.of(id);
 
         return new MockSummaryView(
                 id.asPath(),
@@ -290,7 +323,9 @@ class MockCatalogController {
                 // Whatever validation has learned, which for a mock nobody has checked is that
                 // nothing is known. The list never validates on the reader's behalf — see MockStates.
                 assessment.state().wireName(),
-                assessment.completeness());
+                assessment.completeness(),
+                reach.reachable(),
+                reach.reason());
     }
 
     private MockDetailView detail(MockId id, MockDocument document) {

@@ -42,16 +42,19 @@ public class MockValidationSweep {
     private final MockRepository repository;
     private final MockValidator validator;
     private final MockStates states;
+    private final MockReachability reachability;
     private final SandboxProperties properties;
 
     MockValidationSweep(
             MockRepository repository,
             MockValidator validator,
             MockStates states,
+            MockReachability reachability,
             SandboxProperties properties) {
         this.repository = repository;
         this.validator = validator;
         this.states = states;
+        this.reachability = reachability;
         this.properties = properties;
     }
 
@@ -79,6 +82,7 @@ public class MockValidationSweep {
         long started = System.currentTimeMillis();
         int checked = 0;
         int problems = 0;
+        int unreachable = 0;
 
         for (Scenario scenario : repository.scenarios()) {
             for (MockSummary summary : repository.list(scenario.id(), null)) {
@@ -92,16 +96,26 @@ public class MockValidationSweep {
                 if (check(summary)) {
                     problems++;
                 }
+
+                // Said out loud, once per sweep. A mock at an address no request computes is
+                // invisible in every other way: it lists, it validates, and it never answers.
+                MockReachability.Verdict reach = reachability.of(summary.id());
+                if (!reach.reachable()) {
+                    unreachable++;
+                    log.warn("Unreachable mock {} — {}", summary.id().asPath(), reach.reason());
+                }
+
                 checked++;
             }
         }
 
         log.info(
-                "Validated {} mock(s) on {} in {}ms — {} with something to report",
+                "Validated {} mock(s) on {} in {}ms — {} with something to report, {} unreachable",
                 checked,
                 because,
                 System.currentTimeMillis() - started,
-                problems);
+                problems,
+                unreachable);
     }
 
     /** @return true when the mock is anything other than clean, for the summary line */

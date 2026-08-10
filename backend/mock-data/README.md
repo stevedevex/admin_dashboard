@@ -21,7 +21,9 @@ cd ../app && mvn spring-boot:run
 - **Resolves by declared identity, not whole payloads.** Each operation declares *keys* — the
   fields that identify a request (`path:petId`, `query:limit`, `body:$.name`,
   `xpath:/soapenv:Envelope/...`). Only declared keys are read, so a client adding a correlation id
-  or a timestamp cannot change which mock is served.
+  or a timestamp cannot change which mock is served. A key can be given a short name with `as`,
+  and a mock can match on **any subset** of the declared keys — see
+  [which keys have to match](#which-keys-have-to-match).
 - **Scenarios with inheritance.** A scenario is a directory of mocks. A scenario can `extends` a
   parent and override only what differs — a `partial-data` scenario is a delta on `baseline`, not
   a copy.
@@ -126,9 +128,69 @@ tao.sandbox:
           keys: [ "xpath:/soapenv:Envelope/soapenv:Body/b:GetInvoiceRequest/b:InvoiceId" ]
 ```
 
-Key sources: `path:`, `query:`, `header:`, `body:` (dotted JSONPath), `xpath:`. The default
-strategy needs **all** keys present; `strategy: FIRST_PRESENT` takes the first one found, in
+Key sources: `path:`, `query:`, `header:`, `body:` (dotted JSONPath), `xpath:`.
+
+#### Which keys have to match
+
+| `strategy:` | A mock's filename carries | Use it when |
+|---|---|---|
+| `ALL` (default) | every declared key | the request is identified by the whole set |
+| `FIRST_PRESENT` | exactly one key, the first present in declaration order | one of several identifiers arrives, never both |
+| `BEST_MATCH` | **any subset** — each file says what it matches on | some fields decide the answer and the rest are noise |
+
+`BEST_MATCH` is the one to reach for when a call carries more than it means. Given
+`?id=1001&name=Laptop&category=Electronics&price=999.99` and all four declared as keys:
+
+```
+catalogue/getProduct/name=laptop&category=electronics.json   ← answers whatever id and price are
+catalogue/getProduct/id=1001.json                            ← answers a call that only knows the id
+catalogue/getProduct/_default.json                           ← answers everything else
+```
+
+A file is **eligible** when every `key=value` in its name matches what the request carried. Among
+the eligible, **the one naming the most keys wins** — and `_default`, naming none, is simply the
+least specific of them rather than a special case. Ties go to the file whose keys come first in
 declaration order.
+
+Two files naming different single keys give you *either/or* with a different response each:
+`name=laptop.json` and `category=electronics.json` both match, and the declaration order decides
+which answers when a request satisfies both.
+
+The trade is that specificity becomes implicit — whether `name=laptop.json` answers depends on what
+sits beside it. `POST /__tao/resolve` and every miss diagnostic list the candidates **in the order
+they were tried**, so the ranking is always visible rather than inferred.
+
+#### Shortening long key names
+
+A schema that spells things out produces filenames that are hard to read and, on a Windows checkout
+of the mock store, long enough to hit the 260-character path limit. Any key may be given a short
+name with `as`:
+
+```yaml
+operations:
+  - operation: GetBusinessRelation
+    strategy: BEST_MATCH
+    keys:
+      - "xpath:/soapenv:Envelope/soapenv:Body/b:Request/b:BusinessRelationId as brid"
+      - "xpath:/soapenv:Envelope/soapenv:Body/b:Request/b:BookingCentre as bc"
+```
+
+→ `brid=1001&bc=ch100.xml` rather than `businessrelationid=1001&bookingcentre=ch100.xml`.
+
+Real element names remain the default: they need no configuration and a filename that uses them
+explains itself. **Aliasing an operation renames its files** — every mock saved under the old name
+stops resolving — which is why the next section exists.
+
+#### Mocks that can never answer
+
+A mock can be valid, listed, and unreachable: named for a key the operation does not declare, or
+for a subset under a strategy that demands all of them. Nothing about serving reveals it — the file
+simply never wins and the default answers instead.
+
+So every mock is checked. Unreachable ones are logged at startup and on reload with the reason,
+reported per mock as `reachable` / `unreachableReason` in `GET /__tao/mocks`, and counted as
+`unreachableCount` in `GET /__tao/summary`. It is never an error and never refuses a write: a file
+that cannot be reached today may be one whose configuration is about to change.
 
 ### 3. Add a mock
 
