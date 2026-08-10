@@ -3,3 +3,4 @@
 /.idea/
 **/target/
 /backend/mock-data/target/
+/backend/ai-experimental/target/classes/

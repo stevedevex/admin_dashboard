@@ -9,6 +9,8 @@ import com.tao.sandbox.ai.llm.ModelProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
+
 /**
  * Proving who we are to Azure OpenAI, and saying whether we still can.
  *
@@ -54,9 +56,9 @@ public class AzureModelAccess implements ModelProvider {
     }
 
     private String token() {
-        return credential
-                .getToken(new TokenRequestContext().addScopes(properties.scope()))
-                .block()
+        return Objects.requireNonNull(credential
+                        .getToken(new TokenRequestContext().addScopes(properties.scope()))
+                        .block())
                 .getToken();
     }
 }
