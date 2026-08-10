@@ -75,14 +75,12 @@ class StatusController {
                 mockCount++;
                 largest = Math.max(largest, mock.sizeBytes());
 
-                String state = states.get(mock.id()).state();
-                if ("invalid".equals(state)) {
-                    invalid++;
-                } else if ("incomplete".equals(state)) {
-                    incomplete++;
-                } else if (MockStates.UNCHECKED.equals(state)) {
+                switch (states.get(mock.id()).state()) {
+                    case INVALID -> invalid++;
+                    case INCOMPLETE -> incomplete++;
                     // Counted, not ignored: it is what the other two counts are silent about.
-                    unchecked++;
+                    case UNCHECKED -> unchecked++;
+                    case VALID -> {}
                 }
             }
         }

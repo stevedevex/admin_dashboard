@@ -1,14 +1,13 @@
 package com.tao.sandbox.control;
 
-import com.tao.sandbox.config.SandboxProperties.KeyStrategy;
-import com.tao.sandbox.runtime.resolve.ActiveScenario;
 import com.tao.sandbox.control.view.MockDetailView;
 import com.tao.sandbox.control.view.MockName;
 import com.tao.sandbox.control.view.MockNameRequest;
 import com.tao.sandbox.control.view.MockSaveRequest;
 import com.tao.sandbox.control.view.MockSummaryView;
 import com.tao.sandbox.runtime.match.KeySpec;
-import com.tao.sandbox.runtime.match.Normaliser;
+import com.tao.sandbox.runtime.resolve.ActiveScenario;
+import com.tao.sandbox.runtime.resolve.MockNaming;
 import com.tao.sandbox.runtime.soap.SoapVersion;
 import com.tao.sandbox.spec.OperationDefinition;
 import com.tao.sandbox.spec.ServedOperation;
@@ -17,16 +16,13 @@ import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockDocument;
 import com.tao.sandbox.store.MockId;
 import com.tao.sandbox.store.MockMeta;
-import com.tao.sandbox.store.MockQuery;
 import com.tao.sandbox.store.MockRepository;
 import com.tao.sandbox.store.MockSummary;
+import com.tao.sandbox.store.Payloads;
 import com.tao.sandbox.store.Scenario;
 import com.tao.sandbox.validate.MockStates;
 import com.tao.sandbox.validate.MockValidator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedMap;
 import org.springframework.http.HttpHeaders;
@@ -52,6 +48,7 @@ class MockCatalogController {
     private final MockRepository repository;
     private final SpecRegistry registry;
     private final ActiveScenario activeScenario;
+    private final MockNaming naming;
     private final MockStates states;
     private final MockValidator validator;
 
@@ -59,11 +56,13 @@ class MockCatalogController {
             MockRepository repository,
             SpecRegistry registry,
             ActiveScenario activeScenario,
+            MockNaming naming,
             MockStates states,
             MockValidator validator) {
         this.repository = repository;
         this.registry = registry;
         this.activeScenario = activeScenario;
+        this.naming = naming;
         this.states = states;
         this.validator = validator;
     }
@@ -234,30 +233,11 @@ class MockCatalogController {
                                                 "%s/%s is not served"
                                                         .formatted(request.serviceId(), request.operationId())));
 
-        Map<String, String> supplied = request.keys() == null ? Map.of() : request.keys();
-        SequencedMap<String, String> resolved = new LinkedHashMap<>();
-
-        for (KeySpec key : operation.keys()) {
-            Optional<String> value = lookup(supplied, key).flatMap(Normaliser::normalise);
-            if (value.isEmpty()) {
-                continue;
-            }
-
-            resolved.put(key.name(), value.get());
-
-            if (operation.strategy() == KeyStrategy.FIRST_PRESENT) {
-                // Declaration order is the tie-break, exactly as extraction applies it. Anything
-                // after the first present key is not read from a request, so it must not be
-                // written into a name either.
-                break;
-            }
-        }
+        SequencedMap<String, String> resolved = MockNaming.resolveKeys(operation, request.keys());
 
         // Some keys but not all, under a strategy that requires all: the file would be created and
         // never reached, because no request satisfying fewer keys ever produces this signature.
-        if (operation.strategy() == KeyStrategy.ALL
-                && !resolved.isEmpty()
-                && resolved.size() != operation.keys().size()) {
+        if (!resolved.isEmpty() && !MockNaming.satisfies(operation, resolved)) {
             throw ControlPanelProblem.unprocessable(
                     "incomplete-keys",
                     "Missing key values",
@@ -270,23 +250,12 @@ class MockCatalogController {
                             + "supply every key, or none for the operation's default mock.");
         }
 
-        // No keys at all is not a mistake: it names the fallback the resolver tries when nothing
-        // more specific matches, which is a mock an author legitimately wants to write.
-        String stem =
-                resolved.isEmpty()
-                        ? MockRepository.DEFAULT_STEM
-                        : new MockQuery(null, operation.serviceId(), operation.operationId(), resolved)
-                                .keySignature();
-
-        SequencedMap<String, String> normalised = new LinkedHashMap<>();
-        resolved.forEach((key, value) -> normalised.put(key, value.toLowerCase(Locale.ROOT)));
-
-        return new MockName(stem + "." + extensionFor(operation), normalised);
+        return new MockName(
+                naming.fileNameFor(operation.serviceId(), operation.operationId(), resolved),
+                MockNaming.asWritten(resolved));
     }
 
     // --- internals ---------------------------------------------------------
-
-
 
 
     private MockId parse(String captured) {
@@ -320,7 +289,7 @@ class MockCatalogController {
                 summary.inheritedFrom(),
                 // Whatever validation has learned, which for a mock nobody has checked is that
                 // nothing is known. The list never validates on the reader's behalf — see MockStates.
-                assessment.state(),
+                assessment.state().wireName(),
                 assessment.completeness());
     }
 
@@ -367,45 +336,17 @@ class MockCatalogController {
         if (registry.findOperation(id.serviceId(), id.operationId()).isPresent()) {
             // SOAP. The version is echoed from the request and there is no request here, so 1.1 —
             // the same assumption the fault path makes when it cannot read one.
-            boolean fault = meta.kindOr(MockDocument.Kind.RESPONSE) == MockDocument.Kind.FAULT;
             SoapVersion version = SoapVersion.SOAP_1_1;
-            int declared = fault ? version.httpStatusFor(version.receiverCode()) : 200;
 
             return new MockDetailView.Effective(
-                    meta.statusOr(declared), meta.contentTypeOr(version.contentType()));
+                    meta.statusOr(version.defaultStatusFor(meta.kindOr(MockDocument.Kind.RESPONSE))),
+                    meta.contentTypeOr(version.contentType()));
         }
 
         // A mock for an operation no longer served — a spec changed, or configuration dropped it.
         // The sidecar is all there is to go on, and saying so is more useful than inventing a
         // contract this file no longer has.
         return new MockDetailView.Effective(meta.statusOr(200), meta.contentType());
-    }
-
-    /** SOAP is always XML; REST takes the media type its contract declares. */
-    private String extensionFor(ServedOperation operation) {
-        return registry
-                .findRest(operation.serviceId(), operation.operationId())
-                .map(rest -> Payloads.extensionFor(rest.responseContentType()))
-                .orElse("xml");
-    }
-
-    /**
-     * Accepts the derived name, the raw expression, or the whole declaration.
-     *
-     * <p>{@code GET /__tao/services} reports all three, and a caller holding any of them means the
-     * same field. Being strict here would only convert a caller's reasonable choice into an empty
-     * key set, which produces {@code _default} — a wrong answer that looks like a right one.
-     */
-    private Optional<String> lookup(Map<String, String> supplied, KeySpec key) {
-        for (Map.Entry<String, String> entry : supplied.entrySet()) {
-            String name = entry.getKey();
-            if (name.equalsIgnoreCase(key.name())
-                    || name.equalsIgnoreCase(key.expression())
-                    || name.equalsIgnoreCase(key.source() + ":" + key.expression())) {
-                return Optional.ofNullable(entry.getValue());
-            }
-        }
-        return Optional.empty();
     }
 
     /**

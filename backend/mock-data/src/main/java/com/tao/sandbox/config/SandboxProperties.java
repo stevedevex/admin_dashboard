@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -24,9 +25,18 @@ public record SandboxProperties(
         @DefaultValue @Valid Verdicts verdicts,
         @Valid @NotEmpty List<ServiceConfig> services) {
 
+    /**
+     * Single-valued until a second store exists.
+     *
+     * <p>A document store is a plausible next one — {@link com.tao.sandbox.store.MockRepository} is
+     * written to allow it — but naming it here before it is implemented is worse than not offering
+     * it: the filesystem store is conditional on this property, so selecting the absent value
+     * leaves the context with no repository bean and fails startup with a missing-bean error that
+     * names nothing a reader can act on. Left off the list, the same configuration fails at
+     * binding instead, and Spring's message states the values that do exist.
+     */
     public enum StoreType {
-        FILESYSTEM,
-        MONGODB
+        FILESYSTEM
     }
 
     public record Filesystem(@DefaultValue("./mock-data") String root) {}
@@ -82,7 +92,7 @@ public record SandboxProperties(
             String path,
             /** Prefix bindings for {@code xpath:} keys. Required because default namespaces
              *  carry no prefix and XPath 1.0 cannot address them. */
-            @DefaultValue java.util.Map<String, String> namespaces,
+            @DefaultValue Map<String, String> namespaces,
             /**
              * SOAP envelope header applied to every response from this service, unless a mock
              * supplies its own. Most headers are constant per service, and repeating them in
@@ -119,6 +129,26 @@ public record SandboxProperties(
         /** Every declared key must be present, and all take part in the lookup. */
         ALL,
         /** Take the first key present, in declaration order. */
-        FIRST_PRESENT
+        FIRST_PRESENT;
+
+        /**
+         * Whether the keys found identify a specific mock, or the request falls through to the
+         * operation's default.
+         *
+         * <p>Asked both when a live request is read and when the control panel computes a filename
+         * for one. The rule has to be the same in both, or a file is written under a name that no
+         * request can produce — a mock that exists, lists, and never answers.
+         */
+        public boolean satisfiedBy(int found, int declared) {
+            return switch (this) {
+                case ALL -> found == declared;
+                case FIRST_PRESENT -> found > 0;
+            };
+        }
+
+        /** Declaration order is the tie-break, so nothing past the first present key is read. */
+        public boolean takesFirstOnly() {
+            return this == FIRST_PRESENT;
+        }
     }
 }

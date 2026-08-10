@@ -122,12 +122,12 @@ public class MockValidationSweep {
                             document.body(),
                             document.meta());
 
-            String state = states.record(summary.id(), validation).state();
+            MockStates.State state = states.record(summary.id(), validation).state();
 
             // Unchecked is not a problem, it is an absence of one: nothing could be checked, so
             // nothing was learned. Only a verdict that was actually reached and was not clean
             // belongs in the count.
-            return !MockStates.UNCHECKED.equals(state) && !"valid".equals(state);
+            return state != MockStates.State.UNCHECKED && state != MockStates.State.VALID;
         } catch (RuntimeException e) {
             // A file for an operation no longer served, most likely — configuration was edited and
             // the mock outlived it. Left unchecked rather than failing the sweep: the rest of the

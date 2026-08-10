@@ -2,6 +2,7 @@ package com.tao.sandbox.runtime.soap;
 
 import com.tao.sandbox.observe.RequestLog;
 import com.tao.sandbox.runtime.resolve.MockPipeline;
+import com.tao.sandbox.runtime.resolve.OperationLocator;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockDocument.Kind;
 import com.tao.sandbox.spec.wsdl.SoapOperationDefinition;
@@ -95,33 +96,37 @@ public class SoapRoutes {
                     "Malformed SOAP request", String.valueOf(e.getMessage()));
         }
 
-        String operationName = service.elementToOperation().get(bodyElement);
-        if (operationName == null) {
-            String reason = "Unknown operation for body element " + bodyElement;
-            requests.recordRejected(
-                    service.serviceId(), reason, version.httpStatusFor(version.senderCode()), raw);
-            return fault(version, version.senderCode(), reason,
-                    "Known elements: " + service.elementToOperation().keySet());
-        }
+        SoapOperationDefinition operation;
+        switch (OperationLocator.forSoap(service, bodyElement)) {
+            case OperationLocator.SoapMatch.Served served -> operation = served.operation();
 
-        SoapOperationDefinition operation = service.served().get(operationName);
-        if (operation == null) {
-            requests.recordRejected(
-                    service.serviceId(),
-                    "NOT_IMPLEMENTED: '%s' is in the contract but not configured".formatted(operationName),
-                    501,
-                    raw);
+            case OperationLocator.SoapMatch.Unknown ignored -> {
+                String reason = "Unknown operation for body element " + bodyElement;
+                requests.recordRejected(
+                        service.serviceId(), reason, version.httpStatusFor(version.senderCode()), raw);
+                return fault(version, version.senderCode(), reason,
+                        "Known elements: " + service.elementToOperation().keySet());
+            }
+
             // Present in the contract, absent from configuration. Saying so plainly is far more
             // useful than an empty response that looks like a data problem.
-            return ServerResponse.status(501)
-                    .header("Content-Type", version.contentType())
-                    .body(
-                            SoapEnvelope.fault(
-                                    version,
-                                    version.receiverCode(),
-                                    "NOT_IMPLEMENTED: operation '%s' is not configured for mocking"
-                                            .formatted(operationName),
-                                    "Served operations: " + service.served().keySet()));
+            case OperationLocator.SoapMatch.NotConfigured notConfigured -> {
+                String name = notConfigured.operationName();
+                requests.recordRejected(
+                        service.serviceId(),
+                        "NOT_IMPLEMENTED: '%s' is in the contract but not configured".formatted(name),
+                        501,
+                        raw);
+                return ServerResponse.status(501)
+                        .header("Content-Type", version.contentType())
+                        .body(
+                                SoapEnvelope.fault(
+                                        version,
+                                        version.receiverCode(),
+                                        "NOT_IMPLEMENTED: operation '%s' is not configured for mocking"
+                                                .formatted(name),
+                                        "Served operations: " + service.served().keySet()));
+            }
         }
 
         var outcome =
@@ -152,11 +157,7 @@ public class SoapRoutes {
                         ? SoapEnvelope.fault(version, version.receiverCode(), "Mocked fault", document.body())
                         : SoapEnvelope.wrap(document.body(), version, envelopeHeader);
 
-        // A fault carried over HTTP 200 is not a fault to most clients and proxies — they key off
-        // the status long before they parse the body. So a fault defaults to the version's fault
-        // status, and only an explicit sidecar entry can override that.
-        int defaultStatus = isFault ? version.httpStatusFor(version.receiverCode()) : 200;
-        int status = meta.statusOr(defaultStatus);
+        int status = meta.statusOr(version.defaultStatusFor(meta.kindOr(Kind.RESPONSE)));
 
         // The wrapped envelope, not the stored payload: the log should show what left the server.
         requests.record(outcome.trace(), status, raw, body);

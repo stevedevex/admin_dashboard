@@ -7,15 +7,14 @@ import com.tao.sandbox.runtime.match.DescribedRequestFacade;
 import com.tao.sandbox.runtime.match.RequestFacade;
 import com.tao.sandbox.runtime.resolve.ActiveScenario;
 import com.tao.sandbox.runtime.resolve.MockPipeline;
+import com.tao.sandbox.runtime.resolve.OperationLocator;
 import com.tao.sandbox.runtime.resolve.ResolutionTrace;
 import com.tao.sandbox.runtime.soap.SoapEnvelope;
 import com.tao.sandbox.runtime.soap.SoapRequestFacade;
 import com.tao.sandbox.runtime.soap.SoapVersion;
 import com.tao.sandbox.xml.Xml;
-import com.tao.sandbox.spec.OperationDefinition;
 import com.tao.sandbox.spec.ServedOperation;
 import com.tao.sandbox.spec.SpecRegistry;
-import com.tao.sandbox.spec.wsdl.SoapServiceDefinition;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -23,7 +22,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.xml.namespace.QName;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,8 +29,6 @@ import org.springframework.http.server.PathContainer;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.pattern.PathPattern;
-import org.springframework.web.util.pattern.PathPatternParser;
 import org.w3c.dom.Document;
 
 /**
@@ -41,11 +37,14 @@ import org.w3c.dom.Document;
  * <p>Nothing is served and nothing is stored. It runs the real {@link MockPipeline} rather than a
  * reimplementation of the matching rules — a dry run with its own copy of them would agree with the
  * server right up until they drifted, which is exactly when someone would be relying on it.
+ *
+ * <p>The same applies to the step before matching, which this once did carry its own copy of:
+ * identifying the operation goes through {@link OperationLocator}, so a request the dry run says
+ * lands on an operation is one the router would have sent there. What remains here is only the
+ * work of turning a described or pasted request into something either can read.
  */
 @RestController
 class ResolveController {
-
-    private static final PathPatternParser PATHS = PathPatternParser.defaultInstance;
 
     private final SpecRegistry registry;
     private final MockPipeline pipeline;
@@ -111,31 +110,23 @@ class ResolveController {
         URI uri = URI.create(request.path());
         PathContainer path = PathContainer.parsePath(uri.getRawPath() == null ? request.path() : uri.getRawPath());
 
-        for (OperationDefinition operation : registry.restOperations()) {
-            if (!operation.method().name().equalsIgnoreCase(request.method())) {
-                continue;
-            }
+        OperationLocator.RestMatch match =
+                OperationLocator.forRest(registry.restOperations(), request.method(), path)
+                        .orElseThrow(
+                                () ->
+                                        ControlPanelProblem.unprocessable(
+                                                "no-such-route",
+                                                "Nothing serves that",
+                                                "%s %s matches no served operation. Served: %s"
+                                                        .formatted(request.method(), request.path(), routes())));
 
-            PathPattern pattern = PATHS.parse(operation.path());
-            PathPattern.PathMatchInfo match = pattern.matchAndExtract(path);
-            if (match == null) {
-                continue;
-            }
-
-            return new Attempt(
-                    operation,
-                    new DescribedRequestFacade(
-                            match.getUriVariables(),
-                            queryOf(uri),
-                            headersWithScenario(request.headers(), scenarioId),
-                            request.body()));
-        }
-
-        throw ControlPanelProblem.unprocessable(
-                "no-such-route",
-                "Nothing serves that",
-                "%s %s matches no served operation. Served: %s"
-                        .formatted(request.method(), request.path(), routes()));
+        return new Attempt(
+                match.operation(),
+                new DescribedRequestFacade(
+                        match.pathVariables(),
+                        queryOf(uri),
+                        headersWithScenario(request.headers(), scenarioId),
+                        request.body()));
     }
 
     /**
@@ -174,36 +165,36 @@ class ResolveController {
                     "malformed-envelope", "Not a SOAP envelope", String.valueOf(e.getMessage()));
         }
 
-        for (SoapServiceDefinition service : registry.soapServices()) {
-            String operationName = service.elementToOperation().get(bodyElement);
-            if (operationName == null) {
-                continue;
+        return switch (OperationLocator.forSoap(registry.soapServices(), bodyElement)) {
+            case OperationLocator.SoapMatch.Served served -> {
+                HttpHeaders headers = new HttpHeaders();
+                headersWithScenario(request.headers(), scenarioId).forEach(headers::add);
+
+                yield new Attempt(
+                        served.operation(),
+                        new SoapRequestFacade(
+                                envelope, headers, served.service().namespaces(), version));
             }
 
-            Optional<ServedOperation> operation =
-                    registry.findOperation(service.serviceId(), operationName);
-            if (operation.isEmpty()) {
-                // In the contract, absent from configuration — the same NOT_IMPLEMENTED the live
-                // endpoint answers, said here before anyone sends it for real.
-                throw ControlPanelProblem.unprocessable(
-                        "operation-not-served",
-                        "Not configured for mocking",
-                        "'%s' is in %s's contract but is not configured. Served: %s"
-                                .formatted(operationName, service.serviceId(), service.served().keySet()));
-            }
+            // In the contract, absent from configuration — the same NOT_IMPLEMENTED the live
+            // endpoint answers, said here before anyone sends it for real.
+            case OperationLocator.SoapMatch.NotConfigured notConfigured ->
+                    throw ControlPanelProblem.unprocessable(
+                            "operation-not-served",
+                            "Not configured for mocking",
+                            "'%s' is in %s's contract but is not configured. Served: %s"
+                                    .formatted(
+                                            notConfigured.operationName(),
+                                            notConfigured.service().serviceId(),
+                                            notConfigured.service().served().keySet()));
 
-            HttpHeaders headers = new HttpHeaders();
-            headersWithScenario(request.headers(), scenarioId).forEach(headers::add);
-
-            return new Attempt(
-                    operation.get(),
-                    new SoapRequestFacade(envelope, headers, service.namespaces(), version));
-        }
-
-        throw ControlPanelProblem.unprocessable(
-                "no-such-operation",
-                "Nothing serves that",
-                "No service maps the body element %s. Known elements: %s".formatted(bodyElement, soapElements()));
+            case OperationLocator.SoapMatch.Unknown ignored ->
+                    throw ControlPanelProblem.unprocessable(
+                            "no-such-operation",
+                            "Nothing serves that",
+                            "No service maps the body element %s. Known elements: %s"
+                                    .formatted(bodyElement, soapElements()));
+        };
     }
 
     // --- internals ---------------------------------------------------------

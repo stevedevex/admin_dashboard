@@ -50,6 +50,25 @@ request → identify operation → extract declared keys → normalise
 - **Storage is pluggable** (`store/`): the hot path sees `MockProvider`, the control panel
   `MockRepository`. The filesystem implementation keeps mocks git-versionable and diffable.
 
+### Finding your way around the code
+
+**Searching the source for a served path will not find it.** Client-facing routes carry no
+annotations — they are registered at startup from the parsed contracts, by `runtime/rest/RestRoutes`
+and `runtime/soap/SoapRoutes`. The route table lives in `application.yaml` and the spec, not in the
+code.
+
+So the authoritative answer to "what does this instance serve" is one of:
+
+- the **startup log**, which prints a line per REST route and per SOAP endpoint;
+- `GET /__tao/services`, which reports the same thing to the dashboard.
+
+Both derive from `SpecRegistry`, so neither can drift from what is actually routed.
+
+Each package carries a `package-info.java` saying what it is for and where it sits; the one on
+`com.tao.sandbox` has the pipeline diagram and the layering. Read that first — dependencies run
+upward, with one recorded exception between `spec` and its two loaders. `PackageLayeringTest`
+checks all of this against the source, so the diagram cannot quietly stop being true.
+
 ### Storage layout
 
 ```

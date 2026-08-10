@@ -11,6 +11,7 @@ import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.SpecVersion;
 import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import java.util.ArrayList;
@@ -61,7 +62,7 @@ public class OpenApiSpecLoader {
                 document.getServers() == null
                         ? List.of()
                         : document.getServers().stream()
-                                .map(io.swagger.v3.oas.models.servers.Server::getUrl)
+                                .map(Server::getUrl)
                                 .filter(url -> url != null && !url.isBlank() && !url.equals("/"))
                                 .toList();
 
@@ -250,6 +251,9 @@ public class OpenApiSpecLoader {
      * omit, and 3.0 and 3.1 disagree on how a type is written — {@code "type": "string"} against
      * {@code "type": ["string", "null"]}. Emitting the dialect the document was written in is what
      * keeps the result a schema a validator will accept.
+     *
+     * <p>Swagger's {@code MediaType} is written out in full because Spring's is already
+     * imported here for a constant, and one of the two has to say which it means.
      */
     private String schemaOf(OpenAPI document, io.swagger.v3.oas.models.media.MediaType media) {
         if (media == null || media.getSchema() == null) {

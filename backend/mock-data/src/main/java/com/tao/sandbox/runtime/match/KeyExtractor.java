@@ -31,7 +31,7 @@ public class KeyExtractor {
 
             extracted.put(spec.name(), value.get());
 
-            if (strategy == KeyStrategy.FIRST_PRESENT) {
+            if (strategy.takesFirstOnly()) {
                 // Declaration order is the tie-break. A request carrying several identifiers
                 // resolves by the first declared one, so the outcome is deterministic and the
                 // trace has a single line to explain.
@@ -39,12 +39,6 @@ public class KeyExtractor {
             }
         }
 
-        boolean satisfied =
-                switch (strategy) {
-                    case ALL -> extracted.size() == specs.size();
-                    case FIRST_PRESENT -> !extracted.isEmpty();
-                };
-
-        return new Extraction(extracted, satisfied);
+        return new Extraction(extracted, strategy.satisfiedBy(extracted.size(), specs.size()));
     }
 }

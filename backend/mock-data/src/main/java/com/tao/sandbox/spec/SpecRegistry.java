@@ -4,6 +4,7 @@ import com.tao.sandbox.config.SandboxProperties;
 import com.tao.sandbox.config.SandboxProperties.ServiceConfig;
 import com.tao.sandbox.config.SandboxProperties.ServiceType;
 import com.tao.sandbox.spec.openapi.OpenApiSpecLoader;
+import com.tao.sandbox.spec.wsdl.SoapSchemas;
 import com.tao.sandbox.spec.wsdl.SoapServiceDefinition;
 import com.tao.sandbox.spec.wsdl.WsdlSpecLoader;
 import jakarta.annotation.PostConstruct;
@@ -166,7 +167,7 @@ public class SpecRegistry {
     }
 
     /** The XSD a SOAP service declares, and each operation's response element. */
-    public Optional<com.tao.sandbox.spec.wsdl.SoapSchemas> soapSchemas(String serviceId) {
+    public Optional<SoapSchemas> soapSchemas(String serviceId) {
         return Optional.ofNullable(soapByService.get(serviceId)).map(SoapServiceDefinition::schemas);
     }
 

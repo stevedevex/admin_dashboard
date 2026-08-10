@@ -4,10 +4,10 @@ import com.tao.sandbox.control.view.MockDraft;
 import com.tao.sandbox.observe.RequestLog;
 import com.tao.sandbox.runtime.match.KeySpec;
 import com.tao.sandbox.runtime.resolve.ActiveScenario;
+import com.tao.sandbox.runtime.resolve.MockNaming;
 import com.tao.sandbox.spec.ServedOperation;
 import com.tao.sandbox.spec.SpecRegistry;
 import com.tao.sandbox.store.MockId;
-import com.tao.sandbox.store.MockQuery;
 import com.tao.sandbox.store.MockRepository;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -31,16 +31,19 @@ class RequestLogController {
     private final SpecRegistry registry;
     private final MockRepository repository;
     private final ActiveScenario activeScenario;
+    private final MockNaming naming;
 
     RequestLogController(
             RequestLog requests,
             SpecRegistry registry,
             MockRepository repository,
-            ActiveScenario activeScenario) {
+            ActiveScenario activeScenario,
+            MockNaming naming) {
         this.requests = requests;
         this.registry = registry;
         this.repository = repository;
         this.activeScenario = activeScenario;
+        this.naming = naming;
     }
 
     /**
@@ -115,14 +118,8 @@ class RequestLogController {
         // A call whose keys did not satisfy the strategy resolved through the operation's default,
         // so that is the honest proposal. Naming a file from the partial keys would create one no
         // request can reach — the same trap /mocks/name refuses outright.
-        boolean satisfied =
-                switch (operation.strategy()) {
-                    case ALL -> keys.size() == operation.keys().size();
-                    case FIRST_PRESENT -> !keys.isEmpty();
-                };
-
         String note = null;
-        if (!satisfied && !keys.isEmpty()) {
+        if (!MockNaming.satisfies(operation, keys) && !keys.isEmpty()) {
             note =
                     "This call carried %s, but %s resolves on all of %s. It was answered by the operation's default, so that is what this would write."
                             .formatted(
@@ -133,12 +130,7 @@ class RequestLogController {
         }
 
         String scenarioId = entry.scenarioId() == null ? activeScenario.get() : entry.scenarioId();
-        String stem =
-                keys.isEmpty()
-                        ? MockRepository.DEFAULT_STEM
-                        : new MockQuery(null, entry.serviceId(), entry.operationId(), keys).keySignature();
-
-        String fileName = stem + "." + extensionFor(entry.serviceId(), entry.operationId());
+        String fileName = naming.fileNameFor(entry.serviceId(), entry.operationId(), keys);
         MockId mockId = new MockId(scenarioId, entry.serviceId(), entry.operationId(), fileName);
 
         return new MockDraft(
@@ -152,14 +144,6 @@ class RequestLogController {
                 skeletonFor(entry.serviceId(), entry.operationId()),
                 entry.requestBody(),
                 note);
-    }
-
-    /** SOAP is always XML; REST takes the media type its contract declares. */
-    private String extensionFor(String serviceId, String operationId) {
-        return registry
-                .findRest(serviceId, operationId)
-                .map(rest -> Payloads.extensionFor(rest.responseContentType()))
-                .orElse("xml");
     }
 
     /** The same skeleton {@code /services/…/schema} offers; one source, so the two cannot differ. */

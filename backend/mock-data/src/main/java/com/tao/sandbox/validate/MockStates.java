@@ -1,8 +1,8 @@
 package com.tao.sandbox.validate;
 
 import com.tao.sandbox.store.MockId;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 
@@ -24,12 +24,34 @@ import org.springframework.stereotype.Component;
 @Component
 public class MockStates {
 
-    public static final String UNCHECKED = "unchecked";
+    /**
+     * What is known about one mock.
+     *
+     * <p>An enum rather than the free strings this used to hold. The values are compared in three
+     * places — the summary counts, the sweep's problem tally, and the tree — and a typo in any of
+     * them silently miscounts rather than failing, which is the one way this mechanism can mislead
+     * without anybody noticing.
+     */
+    public enum State {
+        /** Nothing has looked at it. Never to be drawn as a clean bill of health. */
+        UNCHECKED,
+        VALID,
+        INVALID,
+        INCOMPLETE;
+
+        /**
+         * Lowercase on the wire. The dashboard has always received these in lowercase and renders
+         * them directly, so the JSON shape is held fixed here rather than at each view.
+         */
+        public String wireName() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
 
     /** @param completeness null whenever nothing declared any fields to be complete against */
-    public record Assessment(String state, Integer completeness) {
+    public record Assessment(State state, Integer completeness) {
 
-        static final Assessment UNKNOWN = new Assessment(UNCHECKED, null);
+        static final Assessment UNKNOWN = new Assessment(State.UNCHECKED, null);
     }
 
     private final Map<String, Assessment> byId = new ConcurrentHashMap<>();
@@ -60,10 +82,6 @@ public class MockStates {
         byId.clear();
     }
 
-    public Optional<Assessment> find(MockId id) {
-        return Optional.ofNullable(byId.get(id.asPath()));
-    }
-
     private Assessment assess(Validation validation) {
         if (validation.checked() != Validation.Checked.SCHEMA) {
             // Only a schema check learns anything about shape. NONE means no parser applied;
@@ -77,14 +95,14 @@ public class MockStates {
             // fact about the bytes, not about any schema.
             return validation.valid()
                     ? Assessment.UNKNOWN
-                    : new Assessment("invalid", validation.completeness());
+                    : new Assessment(State.INVALID, validation.completeness());
         }
         if (!validation.valid()) {
-            return new Assessment("invalid", validation.completeness());
+            return new Assessment(State.INVALID, validation.completeness());
         }
         if (validation.completeness() != null && validation.completeness() < 100) {
-            return new Assessment("incomplete", validation.completeness());
+            return new Assessment(State.INCOMPLETE, validation.completeness());
         }
-        return new Assessment("valid", validation.completeness());
+        return new Assessment(State.VALID, validation.completeness());
     }
 }

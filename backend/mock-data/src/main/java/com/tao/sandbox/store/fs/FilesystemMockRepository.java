@@ -67,6 +67,16 @@ public class FilesystemMockRepository implements MockRepository {
     /** Keyed by {@code scenario/service/operation/stem} — the address resolution actually uses. */
     private volatile Map<String, CachedMock> mocks = new ConcurrentHashMap<>();
 
+    /**
+     * Each scenario's ancestry, nearest first, resolved once rather than per lookup.
+     *
+     * <p>{@link #resolve} consults the chain inside its inner loop, so walking the parent links on
+     * every request meant re-deriving something that cannot change between reloads. Rebuilt
+     * wherever {@link #scenarios} is, and never read for a scenario it does not hold — an unknown
+     * id still answers with itself, exactly as walking would.
+     */
+    private volatile Map<String, List<String>> chains = new ConcurrentHashMap<>();
+
     /** One mock held whole: payload, sidecars, and the metadata browsing shows. */
     private record CachedMock(MockId id, MockDocument document, long sizeBytes, Instant modifiedAt) {}
 
@@ -84,6 +94,7 @@ public class FilesystemMockRepository implements MockRepository {
         if (!Files.isDirectory(scenarioRoot)) {
             log.warn("No scenarios directory at {} — the sandbox will answer nothing", scenarioRoot);
             this.scenarios = loadedScenarios;
+            this.chains = chainsFor(loadedScenarios);
             this.mocks = loadedMocks;
             return;
         }
@@ -101,6 +112,7 @@ public class FilesystemMockRepository implements MockRepository {
         detectInheritanceCycles(loadedScenarios);
 
         this.scenarios = loadedScenarios;
+        this.chains = chainsFor(loadedScenarios);
         this.mocks = loadedMocks;
         log.info(
                 "Loaded {} scenario(s), {} mock(s) from {}",
@@ -270,6 +282,7 @@ public class FilesystemMockRepository implements MockRepository {
 
         Scenario created = readScenario(directory);
         scenarios.put(id, created);
+        this.chains = chainsFor(scenarios);
         return created;
     }
 
@@ -301,6 +314,7 @@ public class FilesystemMockRepository implements MockRepository {
         }
 
         scenarios.remove(id);
+        this.chains = chainsFor(scenarios);
         mocks.keySet().removeIf(key -> key.startsWith(id + "/"));
     }
 
@@ -395,6 +409,18 @@ public class FilesystemMockRepository implements MockRepository {
 
     /** Scenario ids from the requested one up through its ancestors, nearest first. */
     private List<String> chain(String scenarioId) {
+        List<String> resolved = chains.get(scenarioId);
+        return resolved != null ? resolved : walkFrom(scenarioId, scenarios);
+    }
+
+    /** One chain per known scenario, replacing whatever was held. */
+    private static Map<String, List<String>> chainsFor(Map<String, Scenario> scenarios) {
+        Map<String, List<String>> chains = new ConcurrentHashMap<>();
+        scenarios.keySet().forEach(id -> chains.put(id, walkFrom(id, scenarios)));
+        return chains;
+    }
+
+    private static List<String> walkFrom(String scenarioId, Map<String, Scenario> scenarios) {
         List<String> ordered = new ArrayList<>();
         String current = scenarioId;
 
@@ -404,7 +430,7 @@ public class FilesystemMockRepository implements MockRepository {
             current = scenario == null ? null : scenario.parent();
         }
 
-        return ordered;
+        return List.copyOf(ordered);
     }
 
     /** Filename stems, most specific first. */

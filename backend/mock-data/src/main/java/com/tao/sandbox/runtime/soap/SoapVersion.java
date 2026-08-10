@@ -1,5 +1,6 @@
 package com.tao.sandbox.runtime.soap;
 
+import com.tao.sandbox.store.MockDocument;
 import java.util.Optional;
 import org.w3c.dom.Document;
 
@@ -64,5 +65,20 @@ public enum SoapVersion {
             return 500;
         }
         return faultCode.equals(senderCode()) ? 400 : 500;
+    }
+
+    /**
+     * The status a stored mock answers with before any sidecar overrides it.
+     *
+     * <p>A fault carried over HTTP 200 is not a fault to most clients and proxies — they key off
+     * the status long before they parse the body — so a mock that declares itself one defaults to
+     * the fault status, and only an explicit sidecar entry can move it.
+     *
+     * <p>Stated once because it is asked twice: when a mock is served, and when the control panel
+     * previews what a client would receive. A preview that computed this differently from the
+     * handler would be worse than showing none.
+     */
+    public int defaultStatusFor(MockDocument.Kind kind) {
+        return kind == MockDocument.Kind.FAULT ? httpStatusFor(receiverCode()) : 200;
     }
 }
