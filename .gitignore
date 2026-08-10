@@ -1,6 +1,17 @@
 /docs/
 /.claude/
+
+# --- Editors --------------------------------------------------------------
 /.idea/
+*.iml
+
+# --- Build output ---------------------------------------------------------
+# Maven writes into target/ in every module. The pattern covers all of them, so
+# a new module needs no entry here.
 **/target/
+
+# --- Machine noise --------------------------------------------------------
+.DS_Store
 /backend/mock-data/target/
 /backend/ai-experimental/target/classes/
+

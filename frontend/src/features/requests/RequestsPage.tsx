@@ -71,7 +71,7 @@ export function RequestsPage() {
         </div>
       )}
 
-      <div className={styles.layout}>
+      <div className={selectedId ? styles.layoutInspecting : styles.layoutBrowsing}>
         <Panel title="Calls" flush>
           {log.entries.length === 0 ? (
             <EmptyState title="Nothing called yet">
@@ -82,7 +82,8 @@ export function RequestsPage() {
           )}
         </Panel>
 
-        <RequestDetailPanel entryId={selectedId} />
+        {/* Mounted only while a call is open, so nothing holds space to say it is empty. */}
+        {selectedId && <RequestDetailPanel entryId={selectedId} />}
       </div>
     </>
   );

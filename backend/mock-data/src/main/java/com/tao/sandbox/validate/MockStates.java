@@ -65,10 +65,19 @@ public class MockStates {
     }
 
     private Assessment assess(Validation validation) {
-        if (validation.checked() == Validation.Checked.NONE) {
-            // Nothing was checked, so nothing was learned. Recording a verdict here would make
-            // "we have no validator for this" indistinguishable from "we looked and it was fine".
-            return Assessment.UNKNOWN;
+        if (validation.checked() != Validation.Checked.SCHEMA) {
+            // Only a schema check learns anything about shape. NONE means no parser applied;
+            // SYNTAX means it parsed and nothing judged it — an operation declaring no response
+            // body, or a payload that declares itself an error and so is not the shape the
+            // contract describes. Reporting either as valid would make "nothing assessed this"
+            // indistinguishable from "we checked it against the contract and it passed", which is
+            // the one confusion this whole mechanism exists to prevent.
+            //
+            // A payload that would not parse is still worth saying out loud, though: that is a
+            // fact about the bytes, not about any schema.
+            return validation.valid()
+                    ? Assessment.UNKNOWN
+                    : new Assessment("invalid", validation.completeness());
         }
         if (!validation.valid()) {
             return new Assessment("invalid", validation.completeness());

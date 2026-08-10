@@ -22,6 +22,7 @@ import com.tao.sandbox.store.MockRepository;
 import com.tao.sandbox.store.MockSummary;
 import com.tao.sandbox.store.Scenario;
 import com.tao.sandbox.validate.MockStates;
+import com.tao.sandbox.validate.MockValidator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,16 +53,19 @@ class MockCatalogController {
     private final SpecRegistry registry;
     private final ActiveScenario activeScenario;
     private final MockStates states;
+    private final MockValidator validator;
 
     MockCatalogController(
             MockRepository repository,
             SpecRegistry registry,
             ActiveScenario activeScenario,
-            MockStates states) {
+            MockStates states,
+            MockValidator validator) {
         this.repository = repository;
         this.registry = registry;
         this.activeScenario = activeScenario;
         this.states = states;
+        this.validator = validator;
     }
 
     /**
@@ -154,10 +158,13 @@ class MockCatalogController {
             throw ControlPanelProblem.unprocessable("unknown-scenario", "Cannot save there", e.getMessage());
         }
 
-        // The verdict cached for this mock described the payload that was just replaced.
-        states.invalidate(mockId);
-
         MockDocument saved = repository.get(mockId).orElseThrow();
+
+        // Checked here rather than merely forgotten. The bytes and the schema are both in hand, so
+        // the verdict costs one validation and spares the author the ritual of pressing Validate
+        // on something they have this second written. It is also what keeps `unchecked` meaning
+        // "nothing has looked at this" rather than "this is the most recent thing anybody saved".
+        recordVerdict(mockId, saved);
         return ResponseEntity.status(existing.isPresent() ? HttpStatus.OK : HttpStatus.CREATED)
                 .eTag(MockEtags.etag(saved))
                 .body(detail(mockId, saved));
@@ -185,6 +192,25 @@ class MockCatalogController {
         states.invalidate(mockId);
 
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Check a payload that has just been stored, and remember what was found.
+     *
+     * <p>Never allowed to fail the write. The payload is saved either way — this sandbox serves
+     * what it is given, and refusing a mock because it does not satisfy a schema would make it
+     * impossible to record the very responses somebody is trying to reproduce. A verdict that
+     * could not be reached is simply absent, which is exactly what `unchecked` says.
+     */
+    private void recordVerdict(MockId mockId, MockDocument saved) {
+        try {
+            states.record(
+                    mockId,
+                    validator.validate(
+                            mockId.serviceId(), mockId.operationId(), saved.body(), saved.meta()));
+        } catch (RuntimeException e) {
+            states.invalidate(mockId);
+        }
     }
 
     /**

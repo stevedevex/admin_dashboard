@@ -5,10 +5,27 @@
  */
 .layout {
   display: grid;
-  grid-template-rows: minmax(180px, 40%) 1fr;
   gap: var(--tao-space-4);
   flex: 1;
   min-height: 0;
+}
+
+/*
+ * Nothing selected: the log takes the whole page.
+ *
+ * It used to hold a detail pane open below a list capped at eight rows, so arriving here meant a
+ * cramped list under a large empty box. The list is what gets scanned and the detail is what gets
+ * consulted, so the room goes to the list until something is actually being consulted.
+ */
+.layoutBrowsing {
+  composes: layout;
+  grid-template-rows: 1fr;
+}
+
+/* Something selected: both on screen, the list still holding the larger share. */
+.layoutInspecting {
+  composes: layout;
+  grid-template-rows: minmax(200px, 55%) 1fr;
 }
 
 .notice {

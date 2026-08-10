@@ -44,7 +44,12 @@ export function DashboardPage() {
    * found clean reports. Every zero below therefore says which of the two it is.
    */
   const checked = facts === null ? 0 : facts.mockCount - facts.uncheckedCount;
-  const clean = checked === 0 ? 'nothing checked yet' : `none of ${checked} checked`;
+
+  /**
+   * Said differently per tile. Both read "none of N checked" before, so two tiles carried the
+   * identical sentence and the repetition read as a rendering fault rather than as two facts.
+   */
+  const nothingChecked = checked === 0;
 
   const serving =
     facts !== null && scenarios.status === 'ready'
@@ -77,14 +82,28 @@ export function DashboardPage() {
     {
       label: 'Invalid',
       value: facts === null ? '—' : String(facts.invalidCount),
-      note: facts === null ? '' : facts.invalidCount === 0 ? clean : 'failing schema',
+      note:
+        facts === null
+          ? ''
+          : facts.invalidCount > 0
+            ? 'failing schema'
+            : nothingChecked
+              ? 'nothing checked yet'
+              : `${checked} checked, none failing`,
       attention: facts !== null && facts.invalidCount > 0,
       to: '/mock-data/mocks',
     },
     {
       label: 'Incomplete',
       value: facts === null ? '—' : String(facts.incompleteCount),
-      note: facts === null ? '' : facts.incompleteCount === 0 ? clean : 'partially filled',
+      note:
+        facts === null
+          ? ''
+          : facts.incompleteCount > 0
+            ? 'partially filled'
+            : nothingChecked
+              ? 'nothing checked yet'
+              : 'all fully populated',
       attention: facts !== null && facts.incompleteCount > 0,
       to: '/mock-data/mocks',
     },

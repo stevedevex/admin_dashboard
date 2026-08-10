@@ -27,3 +27,14 @@ body {
 .pad-4 {
   padding: var(--tao-space-4);
 }
+
+/*
+ * A bounded measure for pages whose content is a handful of rows.
+ *
+ * Services and Scenarios are short lists by nature, and stretched to a wide viewport they read as
+ * a page that failed to finish loading rather than one with little to say. Bounding the content
+ * makes the space beside and below it look chosen.
+ */
+.measure {
+  max-width: 1100px;
+}

@@ -9,6 +9,7 @@ import com.tao.sandbox.store.MockRepository;
 import com.tao.sandbox.store.MockSummary;
 import com.tao.sandbox.store.Scenario;
 import com.tao.sandbox.validate.MockStates;
+import com.tao.sandbox.validate.MockValidationSweep;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,18 +33,21 @@ class StatusController {
     private final SpecRegistry registry;
     private final ActiveScenario activeScenario;
     private final MockStates states;
+    private final MockValidationSweep sweep;
 
     StatusController(
             SandboxProperties properties,
             MockRepository repository,
             SpecRegistry registry,
             ActiveScenario activeScenario,
-            MockStates states) {
+            MockStates states,
+            MockValidationSweep sweep) {
         this.properties = properties;
         this.repository = repository;
         this.registry = registry;
         this.activeScenario = activeScenario;
         this.states = states;
+        this.sweep = sweep;
     }
 
     @GetMapping("/status")
@@ -108,8 +112,14 @@ class StatusController {
     @PostMapping("/reload")
     SandboxStatus reload() {
         repository.reload();
-        // Every cached verdict described a file that may have changed underneath us.
+
+        // Every cached verdict described a file that may have changed underneath us, so they all
+        // go — and the library is checked again before answering, because a reload is exactly the
+        // moment somebody wants to know what the files they just pulled in actually contain, and
+        // the status returned here is where they will look for it.
         states.clear();
+        sweep.sweep("reload");
+
         return describe();
     }
 

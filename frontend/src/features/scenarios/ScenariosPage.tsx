@@ -61,27 +61,29 @@ export function ScenariosPage() {
         }
       />
 
-      {/* Stated plainly, because the action in this table is the one control on any page here
-          with consequences beyond the screen. */}
-      <p className={styles.note}>
-        The served scenario is what every caller of the sandbox receives. Browsing a different one
-        on the Mocks page changes nothing for them.
-      </p>
+      <div className="measure">
+        {/* Stated plainly, because the action in this table is the one control on any page here
+            with consequences beyond the screen. */}
+        <p className={styles.note}>
+          The served scenario is what every caller of the sandbox receives. Browsing a different one on the
+          Mocks page changes nothing for them.
+        </p>
 
-      {error && <p className={styles.error}>{error}</p>}
+        {error && <p className={styles.error}>{error}</p>}
 
-      <Panel title="Scenarios" flush>
-        {scenarios.status === 'loading' && <p className="pad-4 muted">Loading…</p>}
-        {scenarios.status === 'error' && <p className="pad-4 muted">{scenarios.error.message}</p>}
-        {scenarios.status === 'ready' && (
-          <ScenarioTable
-            scenarios={scenarios.data}
-            activeId={activeId}
-            switching={switching}
-            onServe={(id) => void serve(id)}
-          />
-        )}
-      </Panel>
+        <Panel title="Scenarios" flush>
+          {scenarios.status === 'loading' && <p className="pad-4 muted">Loading…</p>}
+          {scenarios.status === 'error' && <p className="pad-4 muted">{scenarios.error.message}</p>}
+          {scenarios.status === 'ready' && (
+            <ScenarioTable
+              scenarios={scenarios.data}
+              activeId={activeId}
+              switching={switching}
+              onServe={(id) => void serve(id)}
+            />
+          )}
+        </Panel>
+      </div>
 
       {/* Mounted only while open: the form's defaults must be read when it opens, not when the
           page first rendered and the server had not yet said what it serves. */}

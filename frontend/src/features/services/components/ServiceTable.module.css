@@ -45,7 +45,13 @@
   font-size: var(--tao-text-xs);
 }
 
-.numeric {
+/*
+ * Applied to the header as well as the cell, and specific enough to win.
+ * `.table th` sets text-align on every header, and a bare `.numeric` loses to it on specificity —
+ * which left a right-aligned column of figures sitting under a left-aligned label.
+ */
+.table th.numeric,
+.table td.numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }

@@ -14,6 +14,12 @@ logging.level:
 # ---------------------------------------------------------------------------
 tao.sandbox:
   store: filesystem
+
+  # Off here so the unchecked state is observable. With it on, the sweep races every assertion
+  # about a mock nobody has validated — which is most of them, and exactly what several of these
+  # tests are about. The sweep itself is exercised deliberately, through reload.
+  verdicts:
+    on-startup: false
   # Relative to the module directory, which is where the app is launched from.
   filesystem.root: ./mocks
 

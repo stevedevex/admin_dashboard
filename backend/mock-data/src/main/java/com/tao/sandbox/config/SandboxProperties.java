@@ -21,6 +21,7 @@ public record SandboxProperties(
         @Valid Filesystem filesystem,
         @Valid Scenario scenario,
         @DefaultValue @Valid RequestLog requestLog,
+        @DefaultValue @Valid Verdicts verdicts,
         @Valid @NotEmpty List<ServiceConfig> services) {
 
     public enum StoreType {
@@ -29,6 +30,18 @@ public record SandboxProperties(
     }
 
     public record Filesystem(@DefaultValue("./mock-data") String root) {}
+
+    /**
+     * When the library is checked against its schemas.
+     *
+     * @param onStartup check everything once the application is serving. On by default, because a
+     *     mark that only appears where somebody clicked describes the clicking rather than the
+     *     library — and on a shared store the files nobody here has clicked are exactly the ones
+     *     worth knowing about. Turn it off for a library large enough that the work is unwelcome,
+     *     or for a test that wants to observe the unchecked state; {@code POST /__tao/reload}
+     *     checks everything on demand either way.
+     */
+    public record Verdicts(@DefaultValue("true") boolean onStartup) {}
 
     public record Scenario(
             @DefaultValue("baseline") @NotBlank String active,

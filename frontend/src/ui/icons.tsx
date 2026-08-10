@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
+  Moon,
   Sparkles,
+  Sun,
   Trash2,
   Check,
   CheckCircle2,
@@ -46,6 +48,8 @@ const registry = {
   // Shell
   collapse: PanelLeft,
   help: HelpCircle,
+  light: Sun,
+  dark: Moon,
   search: Search,
   more: MoreVertical,
 

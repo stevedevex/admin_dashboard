@@ -81,26 +81,70 @@ class ControlPanelApiTest {
     }
 
     /**
-     * Nothing has validated anything in a freshly started sandbox, which is exactly when the
-     * invalid and incomplete counts read zero. Reporting how many are unchecked is what keeps those
-     * two zeros from being read as a clean bill of health.
+     * A reload checks the library, so the counts it leaves behind describe the files rather than
+     * the clicking. Nothing is left unchecked afterwards, which is what makes the invalid and
+     * incomplete counts beside it worth reading: a zero there now means "checked, and clean",
+     * where before it could equally have meant "nobody looked".
      *
-     * <p>Reloaded first because verdicts live in a bean shared with every other test sharing this
-     * context, and a reload clears them — which is the same thing a restart does, and the state
-     * this assertion is about.
+     * <p>The unchecked count still earns its place — startup validation can be turned off, and it
+     * is off in these tests, so between boot and the first reload every mock reads unchecked.
+     */
+    /**
+     * A payload that declares itself an error is not the shape the contract describes, and must not
+     * be judged against it.
+     *
+     * <p>Both of the library's deliberate error mocks were reported invalid the first time anything
+     * checked the whole library — a SOAP fault against the success element, and a 503
+     * {@code problem+json} against the pet schema. Both files are correct; the check was not. A
+     * checker that marks correct files broken is one people learn to ignore, so this stays pinned.
+     *
+     * <p>They read unchecked rather than valid: nothing assessed their shape, and saying otherwise
+     * would claim an assurance nobody has.
      */
     @Test
-    void theSummaryReportsHowManyMocksNothingHasChecked() {
+    void aMockDeclaringItselfAnErrorIsNotJudgedAgainstTheSuccessSchema() {
+        assertThat(mvc.post().uri("/__tao/reload").exchange()).hasStatusOk();
+
+        assertThat(mvc.get().uri("/__tao/mocks?scenario=error-cases&service=petstore").exchange())
+                .bodyJson()
+                .extractingPath("$[?(@.id=='error-cases/petstore/showPetById/_default.json')].state")
+                .asArray()
+                .containsExactly("unchecked");
+
+        assertThat(mvc.get().uri("/__tao/mocks?scenario=baseline&service=calculator").exchange())
+                .bodyJson()
+                .extractingPath("$[?(@.id=='baseline/calculator/Divide/inta=10&intb=0.xml')].state")
+                .asArray()
+                .containsExactly("unchecked");
+
+        // And an ordinary success payload is still judged, so the rule above narrows nothing else.
+        assertThat(mvc.get().uri("/__tao/mocks?scenario=baseline&service=petstore").exchange())
+                .bodyJson()
+                .extractingPath("$[?(@.id=='baseline/petstore/showPetById/petid=1.json')].state")
+                .asArray()
+                .containsExactly("valid");
+    }
+
+    @Test
+    void reloadingChecksTheLibraryRatherThanLeavingItUnchecked() {
         assertThat(mvc.post().uri("/__tao/reload").exchange()).hasStatusOk();
 
         MvcTestResult result = mvc.get().uri("/__tao/summary").exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.invalidCount").isEqualTo(0);
-        assertThat(result).bodyJson().extractingPath("$.incompleteCount").isEqualTo(0);
+
+        // Most of the library is judged against a schema. Not all of it: a payload declaring
+        // itself an error is deliberately not the shape the contract describes, so nothing checks
+        // it and it stays unchecked — which is the honest answer, not a clean one.
         assertThat(result)
                 .bodyJson()
                 .extractingPath("$.uncheckedCount")
+                .asNumber()
+                .satisfies(unchecked -> assertThat(unchecked.intValue()).isLessThan(5));
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.mockCount")
                 .asNumber()
                 .satisfies(count -> assertThat(count.intValue()).isGreaterThan(10));
     }
@@ -298,8 +342,14 @@ class ControlPanelApiTest {
                 .extractingPath("$[?(@.operationId=='showPetById')].inheritedFrom")
                 .asArray()
                 .containsOnly("baseline");
-        assertThat(result).bodyJson().extractingPath("$[0].state").isEqualTo("unchecked");
-        assertThat(result).bodyJson().extractingPath("$[0].completeness").isNull();
+        // Present and one of the declared states. Not pinned to a value: verdicts live in a bean
+        // shared by every test in this context, and whether one has been reached by now depends on
+        // which tests ran first. What this test is about is the inheritance flags above.
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$[0].state")
+                .asString()
+                .isIn("unchecked", "valid", "incomplete", "invalid");
     }
 
     @Test

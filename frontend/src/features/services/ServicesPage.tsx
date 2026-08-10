@@ -36,13 +36,15 @@ export function ServicesPage() {
         }
       />
 
-      <StatTiles services={state.status === 'ready' ? state.data : []} />
+      <div className="measure">
+        <StatTiles services={state.status === 'ready' ? state.data : []} />
 
-      <Panel title="Services" flush>
-        {state.status === 'loading' && <p className="pad-4 muted">Loading…</p>}
-        {state.status === 'error' && <p className="pad-4 muted">{state.error.message}</p>}
-        {state.status === 'ready' && <ServiceTable services={state.data} />}
-      </Panel>
+        <Panel title="Services" flush>
+          {state.status === 'loading' && <p className="pad-4 muted">Loading…</p>}
+          {state.status === 'error' && <p className="pad-4 muted">{state.error.message}</p>}
+          {state.status === 'ready' && <ServiceTable services={state.data} />}
+        </Panel>
+      </div>
     </>
   );
 }

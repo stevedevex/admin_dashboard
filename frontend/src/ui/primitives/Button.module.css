@@ -26,16 +26,17 @@
 }
 
 .primary {
-  background: var(--tao-neutral-800);
-  color: var(--tao-neutral-0);
+  background: var(--tao-solid);
+  color: var(--tao-solid-text);
 }
 .primary:hover:not(:disabled) {
-  background: var(--tao-neutral-900);
+  background: var(--tao-solid-hover);
 }
 
 .accent {
   background: var(--tao-accent);
-  color: var(--tao-neutral-0);
+  /* Fixed, not inverted: the accent is the same red in both themes, so its text is too. */
+  color: #ffffff;
 }
 .accent:hover:not(:disabled) {
   background: var(--tao-accent-hover);
