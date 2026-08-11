@@ -1,9 +1,10 @@
 import { useAtom, useSetAtom } from 'jotai';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
 import { PageHeader } from '@/app/layout/PageHeader';
 import { countFiles, filterTree } from './filterTree';
 import { Button, EmptyState, Icon, MetaTag, Panel, TextInput } from '@/ui';
-import { selectedMockIdAtom, viewedScenarioAtom } from './atoms';
+import { viewedScenarioAtom } from './atoms';
 import { MockTree } from './components/MockTree';
 import { NewMockDialog } from './components/NewMockDialog';
 import { RequestProbe } from './components/RequestProbe';
@@ -13,6 +14,7 @@ import { useStoreReload } from '@/hooks/useStoreReload';
 import { mockHandoffAtom } from '@/state/handoff';
 import { useMockHandoff } from './hooks/useMockHandoff';
 import { useMockTree } from './hooks/useMockTree';
+import { mockIdFromSplat, mockUrl } from './url';
 import styles from './MocksPage.module.css';
 
 /**
@@ -30,7 +32,21 @@ import styles from './MocksPage.module.css';
  */
 export function MocksPage() {
   const [viewedScenario, setViewedScenario] = useAtom(viewedScenarioAtom);
-  const [selectedId, setSelectedId] = useAtom(selectedMockIdAtom);
+
+  // The selection lives in the URL, not in component or atom state — see `./url.ts` for why.
+  // `useParams()['*']` is the splat this route was given (`mock-data/mocks/*`), so this is the
+  // only place in the app allowed to turn it into a mock id.
+  const navigate = useNavigate();
+  const selectedId = mockIdFromSplat(useParams()['*']);
+  // `replace`, not push: opening a different file is browsing, the same way switching scenarios
+  // is, and a history entry per click would make the back button step through every file
+  // visited instead of leaving the page. See `RequestProbe.open` and `useMockHandoff` for the
+  // other two places that select a file the same way.
+  const setSelectedId = useCallback(
+    (mockId: string) => void navigate(mockUrl(mockId), { replace: true }),
+    [navigate],
+  );
+
   const store = useStoreReload();
   const tree = useMockTree(viewedScenario);
   const setHandoff = useSetAtom(mockHandoffAtom);

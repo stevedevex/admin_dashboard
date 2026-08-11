@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { api, type ResolutionTrace } from '@/api';
 import { mockHandoffAtom, playgroundHandoffAtom } from '@/state/handoff';
 import { Button, CodeEditor, Icon, Tag } from '@/ui';
-import { requestProbeAtom, selectedMockIdAtom, viewedScenarioAtom } from '../atoms';
+import { requestProbeAtom, viewedScenarioAtom } from '../atoms';
 import styles from './RequestProbe.module.css';
 
 /**
@@ -27,7 +27,6 @@ import styles from './RequestProbe.module.css';
 export function RequestProbe() {
   const [body, setBody] = useAtom(requestProbeAtom);
   const scenarioId = useAtomValue(viewedScenarioAtom);
-  const setSelected = useSetAtom(selectedMockIdAtom);
   const setHandoff = useSetAtom(mockHandoffAtom);
   const setPlayground = useSetAtom(playgroundHandoffAtom);
   const navigate = useNavigate();
@@ -103,8 +102,10 @@ export function RequestProbe() {
 
   const open = (mockId: string) => {
     const [found = scenarioId] = mockId.split('/');
+    // Selecting the file — which means putting it in the URL, see `../url.ts` — is
+    // `useMockHandoff`'s job once this lands; it also has to switch the browsed scenario when
+    // the trace resolved somewhere other than here, which a bare navigate would not do.
     setHandoff({ mockId, scenarioId: found });
-    setSelected(mockId);
     // The trace has done its job once the file it named is open; keeping it expanded holds the
     // editor down to re-state what the reader has just acted on.
     setTrace(null);

@@ -1,7 +1,9 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { mockHandoffAtom } from '@/state/handoff';
-import { draftsAtom, provenanceAtom, selectedMockIdAtom, viewedScenarioAtom } from '../atoms';
+import { draftsAtom, provenanceAtom, viewedScenarioAtom } from '../atoms';
+import { mockUrl } from '../url';
 
 /**
  * Opens whatever another page asked this one to open.
@@ -15,7 +17,7 @@ import { draftsAtom, provenanceAtom, selectedMockIdAtom, viewedScenarioAtom } fr
  */
 export function useMockHandoff() {
   const [handoff, setHandoff] = useAtom(mockHandoffAtom);
-  const setSelected = useSetAtom(selectedMockIdAtom);
+  const navigate = useNavigate();
   const setViewedScenario = useSetAtom(viewedScenarioAtom);
   const setDrafts = useSetAtom(draftsAtom);
   const setProvenance = useSetAtom(provenanceAtom);
@@ -24,7 +26,11 @@ export function useMockHandoff() {
     if (!handoff) return;
 
     setViewedScenario(handoff.scenarioId);
-    setSelected(handoff.mockId);
+    // `replace`: the caller already pushed the trip to this page (see `RequestDetailPanel`); this
+    // only fills in which file that trip was for, so it belongs on the same history entry rather
+    // than a new one — a `push` here would make "back" from the mock land on the mocks page with
+    // nothing open instead of back where the handoff came from.
+    void navigate(mockUrl(handoff.mockId), { replace: true });
 
     // A body means the mock does not exist yet and this is its starting point. Without one the
     // caller only wanted it selected, and seeding a draft would falsely mark it edited.
@@ -37,5 +43,5 @@ export function useMockHandoff() {
     }
 
     setHandoff(null);
-  }, [handoff, setHandoff, setSelected, setViewedScenario, setDrafts, setProvenance]);
+  }, [handoff, setHandoff, navigate, setViewedScenario, setDrafts, setProvenance]);
 }

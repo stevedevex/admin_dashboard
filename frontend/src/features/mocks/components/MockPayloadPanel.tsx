@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   api,
   type AiStatus,
@@ -24,13 +25,8 @@ import {
   type CodeMarker,
 } from '@/ui';
 import { storeNonceAtom } from '@/state/store';
-import {
-  draftsAtom,
-  provenanceAtom,
-  reloadNonceAtom,
-  requestProbeAtom,
-  selectedMockIdAtom,
-} from '../atoms';
+import { draftsAtom, provenanceAtom, reloadNonceAtom, requestProbeAtom } from '../atoms';
+import { mockUrl } from '../url';
 import { CasePicker } from './CasePicker';
 import { ContractStrip } from './ContractStrip';
 import { GenerateDialog } from './GenerateDialog';
@@ -122,7 +118,7 @@ function Loaded({
   const [drafts, setDrafts] = useAtom(draftsAtom);
   const [provenance, setProvenance] = useAtom(provenanceAtom);
   const setProbe = useSetAtom(requestProbeAtom);
-  const setSelected = useSetAtom(selectedMockIdAtom);
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
@@ -215,8 +211,9 @@ function Loaded({
       await api.deleteMock(mockId);
 
       // Selection first, so nothing re-fetches a file that is gone and renders "not found" at
-      // somebody who just deleted it deliberately.
-      setSelected(null);
+      // somebody who just deleted it deliberately. `replace`: the deleted file's URL should not
+      // be one more "back" step away.
+      await navigate(mockUrl(null), { replace: true });
       discard();
       bumpReload((n) => n + 1);
     } catch (cause) {

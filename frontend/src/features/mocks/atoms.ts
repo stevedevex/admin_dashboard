@@ -2,7 +2,8 @@ import { atom } from 'jotai';
 
 /** Feature-scoped state. Nothing outside `features/mocks` reads this. */
 
-export const selectedMockIdAtom = atom<string | null>(null);
+// There is deliberately no `selectedMockIdAtom` here. Which file is open lives in the URL —
+// see `../url.ts` — because that is the one copy of it a page reload cannot silently drop.
 
 /**
  * The scenario currently being *browsed*.

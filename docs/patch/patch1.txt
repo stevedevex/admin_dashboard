@@ -1,0 +1,303 @@
+diff --git a/frontend/src/app/router.tsx b/frontend/src/app/router.tsx
+index 5c25cc5..45b08d9 100644
+--- a/frontend/src/app/router.tsx
++++ b/frontend/src/app/router.tsx
+@@ -17,7 +17,10 @@ export const router = createBrowserRouter([
+       { index: true, element: <Navigate to={DEFAULT_ROUTE} replace /> },
+       { path: 'dashboard', element: <DashboardPage /> },
+       { path: 'mock-data/services', element: <ServicesPage /> },
+-      { path: 'mock-data/mocks', element: <MocksPage /> },
++      // The trailing splat is the selected mock id (`scenario/service/operation/file`, one
++      // segment per slash) — see `features/mocks/url.ts`. It matches the bare path too, so
++      // `/mock-data/mocks` with nothing selected still routes here.
++      { path: 'mock-data/mocks/*', element: <MocksPage /> },
+       { path: 'mock-data/scenarios', element: <ScenariosPage /> },
+       { path: 'mock-data/requests', element: <RequestsPage /> },
+       { path: 'mock-data/playground', element: <PlaygroundPage /> },
+diff --git a/frontend/src/features/mocks/MocksPage.tsx b/frontend/src/features/mocks/MocksPage.tsx
+index 093f826..7c6d851 100644
+--- a/frontend/src/features/mocks/MocksPage.tsx
++++ b/frontend/src/features/mocks/MocksPage.tsx
+@@ -1,9 +1,10 @@
+ import { useAtom, useSetAtom } from 'jotai';
+-import { useMemo, useState } from 'react';
++import { useCallback, useMemo, useState } from 'react';
++import { useNavigate, useParams } from 'react-router';
+ import { PageHeader } from '@/app/layout/PageHeader';
+ import { countFiles, filterTree } from './filterTree';
+ import { Button, EmptyState, Icon, MetaTag, Panel, TextInput } from '@/ui';
+-import { selectedMockIdAtom, viewedScenarioAtom } from './atoms';
++import { viewedScenarioAtom } from './atoms';
+ import { MockTree } from './components/MockTree';
+ import { NewMockDialog } from './components/NewMockDialog';
+ import { RequestProbe } from './components/RequestProbe';
+@@ -13,6 +14,7 @@ import { useStoreReload } from '@/hooks/useStoreReload';
+ import { mockHandoffAtom } from '@/state/handoff';
+ import { useMockHandoff } from './hooks/useMockHandoff';
+ import { useMockTree } from './hooks/useMockTree';
++import { mockIdFromSplat, mockUrl } from './url';
+ import styles from './MocksPage.module.css';
+ 
+ /**
+@@ -30,7 +32,21 @@ import styles from './MocksPage.module.css';
+  */
+ export function MocksPage() {
+   const [viewedScenario, setViewedScenario] = useAtom(viewedScenarioAtom);
+-  const [selectedId, setSelectedId] = useAtom(selectedMockIdAtom);
++
++  // The selection lives in the URL, not in component or atom state — see `./url.ts` for why.
++  // `useParams()['*']` is the splat this route was given (`mock-data/mocks/*`), so this is the
++  // only place in the app allowed to turn it into a mock id.
++  const navigate = useNavigate();
++  const selectedId = mockIdFromSplat(useParams()['*']);
++  // `replace`, not push: opening a different file is browsing, the same way switching scenarios
++  // is, and a history entry per click would make the back button step through every file
++  // visited instead of leaving the page. See `RequestProbe.open` and `useMockHandoff` for the
++  // other two places that select a file the same way.
++  const setSelectedId = useCallback(
++    (mockId: string) => void navigate(mockUrl(mockId), { replace: true }),
++    [navigate],
++  );
++
+   const store = useStoreReload();
+   const tree = useMockTree(viewedScenario);
+   const setHandoff = useSetAtom(mockHandoffAtom);
+diff --git a/frontend/src/features/mocks/atoms.ts b/frontend/src/features/mocks/atoms.ts
+index ec3c438..12716d1 100644
+--- a/frontend/src/features/mocks/atoms.ts
++++ b/frontend/src/features/mocks/atoms.ts
+@@ -2,7 +2,8 @@ import { atom } from 'jotai';
+ 
+ /** Feature-scoped state. Nothing outside `features/mocks` reads this. */
+ 
+-export const selectedMockIdAtom = atom<string | null>(null);
++// There is deliberately no `selectedMockIdAtom` here. Which file is open lives in the URL —
++// see `../url.ts` — because that is the one copy of it a page reload cannot silently drop.
+ 
+ /**
+  * The scenario currently being *browsed*.
+diff --git a/frontend/src/features/mocks/components/MockPayloadPanel.tsx b/frontend/src/features/mocks/components/MockPayloadPanel.tsx
+index 8d616cf..8ea91f5 100644
+--- a/frontend/src/features/mocks/components/MockPayloadPanel.tsx
++++ b/frontend/src/features/mocks/components/MockPayloadPanel.tsx
+@@ -1,5 +1,6 @@
+ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+ import { useMemo, useState } from 'react';
++import { useNavigate } from 'react-router';
+ import {
+   api,
+   type AiStatus,
+@@ -24,13 +25,8 @@ import {
+   type CodeMarker,
+ } from '@/ui';
+ import { storeNonceAtom } from '@/state/store';
+-import {
+-  draftsAtom,
+-  provenanceAtom,
+-  reloadNonceAtom,
+-  requestProbeAtom,
+-  selectedMockIdAtom,
+-} from '../atoms';
++import { draftsAtom, provenanceAtom, reloadNonceAtom, requestProbeAtom } from '../atoms';
++import { mockUrl } from '../url';
+ import { CasePicker } from './CasePicker';
+ import { ContractStrip } from './ContractStrip';
+ import { GenerateDialog } from './GenerateDialog';
+@@ -122,7 +118,7 @@ function Loaded({
+   const [drafts, setDrafts] = useAtom(draftsAtom);
+   const [provenance, setProvenance] = useAtom(provenanceAtom);
+   const setProbe = useSetAtom(requestProbeAtom);
+-  const setSelected = useSetAtom(selectedMockIdAtom);
++  const navigate = useNavigate();
+   const [saving, setSaving] = useState(false);
+   const [saveError, setSaveError] = useState<string | null>(null);
+   const [validating, setValidating] = useState(false);
+@@ -215,8 +211,9 @@ function Loaded({
+       await api.deleteMock(mockId);
+ 
+       // Selection first, so nothing re-fetches a file that is gone and renders "not found" at
+-      // somebody who just deleted it deliberately.
+-      setSelected(null);
++      // somebody who just deleted it deliberately. `replace`: the deleted file's URL should not
++      // be one more "back" step away.
++      await navigate(mockUrl(null), { replace: true });
+       discard();
+       bumpReload((n) => n + 1);
+     } catch (cause) {
+diff --git a/frontend/src/features/mocks/components/RequestProbe.tsx b/frontend/src/features/mocks/components/RequestProbe.tsx
+index 95dd2b9..9d61466 100644
+--- a/frontend/src/features/mocks/components/RequestProbe.tsx
++++ b/frontend/src/features/mocks/components/RequestProbe.tsx
+@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
+ import { api, type ResolutionTrace } from '@/api';
+ import { mockHandoffAtom, playgroundHandoffAtom } from '@/state/handoff';
+ import { Button, CodeEditor, Icon, Tag } from '@/ui';
+-import { requestProbeAtom, selectedMockIdAtom, viewedScenarioAtom } from '../atoms';
++import { requestProbeAtom, viewedScenarioAtom } from '../atoms';
+ import styles from './RequestProbe.module.css';
+ 
+ /**
+@@ -27,7 +27,6 @@ import styles from './RequestProbe.module.css';
+ export function RequestProbe() {
+   const [body, setBody] = useAtom(requestProbeAtom);
+   const scenarioId = useAtomValue(viewedScenarioAtom);
+-  const setSelected = useSetAtom(selectedMockIdAtom);
+   const setHandoff = useSetAtom(mockHandoffAtom);
+   const setPlayground = useSetAtom(playgroundHandoffAtom);
+   const navigate = useNavigate();
+@@ -103,8 +102,10 @@ export function RequestProbe() {
+ 
+   const open = (mockId: string) => {
+     const [found = scenarioId] = mockId.split('/');
++    // Selecting the file — which means putting it in the URL, see `../url.ts` — is
++    // `useMockHandoff`'s job once this lands; it also has to switch the browsed scenario when
++    // the trace resolved somewhere other than here, which a bare navigate would not do.
+     setHandoff({ mockId, scenarioId: found });
+-    setSelected(mockId);
+     // The trace has done its job once the file it named is open; keeping it expanded holds the
+     // editor down to re-state what the reader has just acted on.
+     setTrace(null);
+diff --git a/frontend/src/features/mocks/hooks/useMockHandoff.ts b/frontend/src/features/mocks/hooks/useMockHandoff.ts
+index eb1a9e0..7520c0c 100644
+--- a/frontend/src/features/mocks/hooks/useMockHandoff.ts
++++ b/frontend/src/features/mocks/hooks/useMockHandoff.ts
+@@ -1,7 +1,9 @@
+ import { useAtom, useSetAtom } from 'jotai';
+ import { useEffect } from 'react';
++import { useNavigate } from 'react-router';
+ import { mockHandoffAtom } from '@/state/handoff';
+-import { draftsAtom, provenanceAtom, selectedMockIdAtom, viewedScenarioAtom } from '../atoms';
++import { draftsAtom, provenanceAtom, viewedScenarioAtom } from '../atoms';
++import { mockUrl } from '../url';
+ 
+ /**
+  * Opens whatever another page asked this one to open.
+@@ -15,7 +17,7 @@ import { draftsAtom, provenanceAtom, selectedMockIdAtom, viewedScenarioAtom } fr
+  */
+ export function useMockHandoff() {
+   const [handoff, setHandoff] = useAtom(mockHandoffAtom);
+-  const setSelected = useSetAtom(selectedMockIdAtom);
++  const navigate = useNavigate();
+   const setViewedScenario = useSetAtom(viewedScenarioAtom);
+   const setDrafts = useSetAtom(draftsAtom);
+   const setProvenance = useSetAtom(provenanceAtom);
+@@ -24,7 +26,11 @@ export function useMockHandoff() {
+     if (!handoff) return;
+ 
+     setViewedScenario(handoff.scenarioId);
+-    setSelected(handoff.mockId);
++    // `replace`: the caller already pushed the trip to this page (see `RequestDetailPanel`); this
++    // only fills in which file that trip was for, so it belongs on the same history entry rather
++    // than a new one — a `push` here would make "back" from the mock land on the mocks page with
++    // nothing open instead of back where the handoff came from.
++    void navigate(mockUrl(handoff.mockId), { replace: true });
+ 
+     // A body means the mock does not exist yet and this is its starting point. Without one the
+     // caller only wanted it selected, and seeding a draft would falsely mark it edited.
+@@ -37,5 +43,5 @@ export function useMockHandoff() {
+     }
+ 
+     setHandoff(null);
+-  }, [handoff, setHandoff, setSelected, setViewedScenario, setDrafts, setProvenance]);
++  }, [handoff, setHandoff, navigate, setViewedScenario, setDrafts, setProvenance]);
+ }
+diff --git a/frontend/src/features/mocks/url.test.ts b/frontend/src/features/mocks/url.test.ts
+new file mode 100644
+index 0000000..66211c2
+--- /dev/null
++++ b/frontend/src/features/mocks/url.test.ts
+@@ -0,0 +1,46 @@
++import { describe, expect, it } from 'vitest';
++import { mockIdFromSplat, mockUrl } from './url';
++
++describe('mockUrl', () => {
++  it('is the bare page for no selection', () => {
++    expect(mockUrl(null)).toBe('/mock-data/mocks');
++  });
++
++  it('lays a mock id down as one path segment per part', () => {
++    expect(mockUrl('baseline/petstore/listPets/_default.json')).toBe(
++      '/mock-data/mocks/baseline/petstore/listPets/_default.json',
++    );
++  });
++
++  it('escapes a segment that would otherwise change what the URL means', () => {
++    // A `#` would truncate the path into a fragment, a `?` into a query string, and a `/` would
++    // add a segment that was not part of the id — exactly the class of file name "New Mock"
++    // never rejects.
++    expect(mockUrl('baseline/petstore/listPets/weird#name?.json')).toBe(
++      '/mock-data/mocks/baseline/petstore/listPets/weird%23name%3F.json',
++    );
++  });
++});
++
++describe('mockIdFromSplat', () => {
++  it('is no selection for an absent or empty splat', () => {
++    expect(mockIdFromSplat(undefined)).toBeNull();
++    expect(mockIdFromSplat('')).toBeNull();
++  });
++
++  it('reads a splat back into the same id mockUrl encoded it from', () => {
++    expect(mockIdFromSplat('baseline/petstore/listPets/_default.json')).toBe(
++      'baseline/petstore/listPets/_default.json',
++    );
++  });
++
++  it('un-escapes a segment mockUrl escaped, round-tripping the original id', () => {
++    const id = 'baseline/petstore/listPets/weird#name?.json';
++    const splat = mockUrl(id).replace('/mock-data/mocks/', '');
++    expect(mockIdFromSplat(splat)).toBe(id);
++  });
++
++  it('lands on "nothing selected" for a splat a person mistyped, rather than throwing', () => {
++    expect(mockIdFromSplat('baseline/petstore/listPets/%')).toBeNull();
++  });
++});
+diff --git a/frontend/src/features/mocks/url.ts b/frontend/src/features/mocks/url.ts
+new file mode 100644
+index 0000000..ea44f81
+--- /dev/null
++++ b/frontend/src/features/mocks/url.ts
+@@ -0,0 +1,42 @@
++/**
++ * The Mocks page's selection, encoded into the address bar — and back.
++ *
++ * A mock id already reads as `scenario/service/operation/file`, the same shape a sequence of URL
++ * path segments takes, so it becomes the route's splat directly rather than a separate query
++ * param or piece of in-memory state. That is the whole fix for the vanishing Validate/Save
++ * buttons: they were never conditional on anything fragile, but the page used to hold "which file
++ * is open" in a plain Jotai atom with no persistence, so a refresh, a shared link, or the browser
++ * back button silently reset it to nothing and the editor — buttons included — disappeared with
++ * it. The URL cannot do that; it is what survives a reload.
++ *
++ * **Do not reintroduce a `selectedMockIdAtom`.** Every place that changes the selection must go
++ * through {@link mockUrl} and `navigate`, and every place that reads it must come from
++ * `useParams()['*']` (via {@link mockIdFromSplat}) — so there is exactly one source of truth, and
++ * it is the one thing on this page that a reload cannot lose.
++ */
++
++/** The Mocks page URL for a given selection — or the bare page, for "nothing open". */
++export function mockUrl(mockId: string | null): string {
++  if (!mockId) return '/mock-data/mocks';
++  return `/mock-data/mocks/${mockId.split('/').map(encodeURIComponent).join('/')}`;
++}
++
++/**
++ * The inverse of {@link mockUrl}: a route splat back into a mock id, or `null` for "nothing
++ * open".
++ *
++ * Wrapped in a `try`, not because the app ever produces a malformed splat, but because this one
++ * also has to survive a URL a person typed or edited by hand — a stray `%` should land on "no
++ * file selected", not a crashed page.
++ */
++export function mockIdFromSplat(splat: string | undefined): string | null {
++  if (!splat) return null;
++  try {
++    return splat
++      .split('/')
++      .map((segment) => decodeURIComponent(segment))
++      .join('/');
++  } catch {
++    return null;
++  }
++}

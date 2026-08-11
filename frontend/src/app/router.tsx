@@ -17,7 +17,10 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to={DEFAULT_ROUTE} replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'mock-data/services', element: <ServicesPage /> },
-      { path: 'mock-data/mocks', element: <MocksPage /> },
+      // The trailing splat is the selected mock id (`scenario/service/operation/file`, one
+      // segment per slash) — see `features/mocks/url.ts`. It matches the bare path too, so
+      // `/mock-data/mocks` with nothing selected still routes here.
+      { path: 'mock-data/mocks/*', element: <MocksPage /> },
       { path: 'mock-data/scenarios', element: <ScenariosPage /> },
       { path: 'mock-data/requests', element: <RequestsPage /> },
       { path: 'mock-data/playground', element: <PlaygroundPage /> },
