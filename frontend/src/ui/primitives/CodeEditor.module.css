@@ -12,6 +12,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  min-width: 0;
 }
 
 .wrap > * {
@@ -19,11 +20,21 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 
+/*
+ * The last stop of the same containment chain `min-height: 0` runs on every level above — but for
+ * the axis this pane actually overflows on. A long, unwrapped line (see `CodeEditor.tsx` for why
+ * lines aren't wrapped) has real intrinsic width, and `.cm-editor` inheriting the default
+ * `min-width: auto` let that width win over `flex: 1`, growing every ancestor up to the page
+ * itself instead of staying inside `.cm-scroller`'s own `overflow: auto`. Without this, the
+ * Validate/Save footer below rides along with that growth and ends up off-screen to the right.
+ */
 .wrap :global(.cm-editor) {
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 
 .loading {

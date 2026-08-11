@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   background: var(--tao-surface);
   border: 1px solid var(--tao-border);
   border-radius: var(--tao-radius-lg);
@@ -56,6 +57,7 @@
 .body {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   padding: var(--tao-space-4);
   overflow: auto;
 }
@@ -63,6 +65,7 @@
 .bodyFlush {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: auto;
 }
 

@@ -1,6 +1,12 @@
 .layout {
   display: grid;
-  grid-template-columns: minmax(240px, 300px) 1fr;
+  /*
+   * `minmax(0, 1fr)`, not bare `1fr`: a grid track still defers to its item's intrinsic min-width
+   * unless told not to, so an unwrapped long line in the editor below was growing this whole
+   * column — and the page along with it — out to the line's width instead of scrolling inside
+   * its own pane. The `0` floor is what makes the track actually shrinkable.
+   */
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: var(--tao-space-4);
   flex: 1;
   min-height: 0;
@@ -16,6 +22,7 @@
   grid-template-rows: auto 1fr;
   gap: var(--tao-space-4);
   min-height: 0;
+  min-width: 0;
 }
 
 .requestHint {

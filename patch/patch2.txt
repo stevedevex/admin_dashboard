@@ -1,0 +1,108 @@
+diff --git a/frontend/src/features/mocks/MocksPage.module.css b/frontend/src/features/mocks/MocksPage.module.css
+index 49fd392..b2a7428 100644
+--- a/frontend/src/features/mocks/MocksPage.module.css
++++ b/frontend/src/features/mocks/MocksPage.module.css
+@@ -1,6 +1,12 @@
+ .layout {
+   display: grid;
+-  grid-template-columns: minmax(240px, 300px) 1fr;
++  /*
++   * `minmax(0, 1fr)`, not bare `1fr`: a grid track still defers to its item's intrinsic min-width
++   * unless told not to, so an unwrapped long line in the editor below was growing this whole
++   * column — and the page along with it — out to the line's width instead of scrolling inside
++   * its own pane. The `0` floor is what makes the track actually shrinkable.
++   */
++  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+   gap: var(--tao-space-4);
+   flex: 1;
+   min-height: 0;
+@@ -16,6 +22,7 @@
+   grid-template-rows: auto 1fr;
+   gap: var(--tao-space-4);
+   min-height: 0;
++  min-width: 0;
+ }
+ 
+ .requestHint {
+diff --git a/frontend/src/features/mocks/components/MockPayloadPanel.module.css b/frontend/src/features/mocks/components/MockPayloadPanel.module.css
+index 60eeecd..a91af23 100644
+--- a/frontend/src/features/mocks/components/MockPayloadPanel.module.css
++++ b/frontend/src/features/mocks/components/MockPayloadPanel.module.css
+@@ -2,6 +2,7 @@
+   display: flex;
+   flex-direction: column;
+   min-height: 0;
++  min-width: 0;
+   height: 100%;
+ }
+ 
+@@ -17,6 +18,7 @@
+ .editor {
+   flex: 1;
+   min-height: 0;
++  min-width: 0;
+ }
+ 
+ /*
+diff --git a/frontend/src/ui/primitives/CodeEditor.module.css b/frontend/src/ui/primitives/CodeEditor.module.css
+index 05a58f6..438be95 100644
+--- a/frontend/src/ui/primitives/CodeEditor.module.css
++++ b/frontend/src/ui/primitives/CodeEditor.module.css
+@@ -12,6 +12,7 @@
+   flex-direction: column;
+   height: 100%;
+   min-height: 0;
++  min-width: 0;
+ }
+ 
+ .wrap > * {
+@@ -19,11 +20,21 @@
+   flex-direction: column;
+   flex: 1;
+   min-height: 0;
++  min-width: 0;
+ }
+ 
++/*
++ * The last stop of the same containment chain `min-height: 0` runs on every level above — but for
++ * the axis this pane actually overflows on. A long, unwrapped line (see `CodeEditor.tsx` for why
++ * lines aren't wrapped) has real intrinsic width, and `.cm-editor` inheriting the default
++ * `min-width: auto` let that width win over `flex: 1`, growing every ancestor up to the page
++ * itself instead of staying inside `.cm-scroller`'s own `overflow: auto`. Without this, the
++ * Validate/Save footer below rides along with that growth and ends up off-screen to the right.
++ */
+ .wrap :global(.cm-editor) {
+   flex: 1;
+   min-height: 0;
++  min-width: 0;
+ }
+ 
+ .loading {
+diff --git a/frontend/src/ui/primitives/Panel.module.css b/frontend/src/ui/primitives/Panel.module.css
+index a7e5229..3414484 100644
+--- a/frontend/src/ui/primitives/Panel.module.css
++++ b/frontend/src/ui/primitives/Panel.module.css
+@@ -2,6 +2,7 @@
+   display: flex;
+   flex-direction: column;
+   min-height: 0;
++  min-width: 0;
+   background: var(--tao-surface);
+   border: 1px solid var(--tao-border);
+   border-radius: var(--tao-radius-lg);
+@@ -56,6 +57,7 @@
+ .body {
+   flex: 1;
+   min-height: 0;
++  min-width: 0;
+   padding: var(--tao-space-4);
+   overflow: auto;
+ }
+@@ -63,6 +65,7 @@
+ .bodyFlush {
+   flex: 1;
+   min-height: 0;
++  min-width: 0;
+   overflow: auto;
+ }
+ 
